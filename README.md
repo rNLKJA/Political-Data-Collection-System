@@ -1,6 +1,6 @@
 # Political Data Collection System
 
-A comprehensive data collection and analysis system for extracting political documents and debate transcripts from the UC Santa Barbara American Presidency Project website.
+A data collection and analysis system for extracting political documents and debate transcripts from the UC Santa Barbara American Presidency Project website.
 
 ## Project Overview
 
