@@ -15,6 +15,26 @@ function text(children: ReactNode): string {
   return "";
 }
 
+/** The hast node shape ReactMarkdown passes to component overrides (only what is read here). */
+type HastNode = { type: string; tagName?: string; value?: string; children?: HastNode[] };
+
+function hastText(n: HastNode): string {
+  if (n.type === "text") return n.value ?? "";
+  return (n.children ?? []).map(hastText).join("");
+}
+
+/** "Status, Decided, Recorded, Owner": the header cells, so each table region has its own name. */
+function headerText(node: unknown): string {
+  const find = (n: HastNode): HastNode | undefined =>
+    n.tagName === "tr" ? n : (n.children ?? []).map(find).find(Boolean);
+  const row = node ? find(node as HastNode) : undefined;
+  return (row?.children ?? [])
+    .filter((c) => c.tagName === "th" || c.tagName === "td")
+    .map((c) => hastText(c).trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 const components: Components = {
   h2: ({ children }) => (
     <h2
@@ -55,11 +75,11 @@ const components: Components = {
       </a>
     );
   },
-  table: ({ children }) => (
+  table: ({ children, node }) => (
     <div
       className="mt-5 overflow-x-auto rounded-lg border border-border bg-card"
       role="region"
-      aria-label="Table (scrolls sideways on small screens)"
+      aria-label={`Table: ${headerText(node) || "untitled"}`}
       tabIndex={0}
     >
       <table className="w-full min-w-[34rem] text-left text-sm">{children}</table>

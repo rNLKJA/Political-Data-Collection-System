@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { Callout, SourceLink, StatTile } from "@/components/common/bits";
 import { PageIntro, Panel, Section } from "@/components/common/page-intro";
-import { pctInterval, numInterval } from "@/components/topics/format";
+import { numInterval } from "@/components/topics/format";
 import { TopicHarness, type HarnessItem } from "@/components/topics/topic-harness";
 import { buildSystemPrompt, buildUserMessage, DEFAULT_BATCH_SIZE } from "@/lib/ai/topic-labels";
 import { formatDate, formatInt, formatPercent } from "@/lib/format";
@@ -76,9 +76,9 @@ export default function TopicsPage() {
             note={`95% CI ${score.kappa.lower.toFixed(2)} to ${score.kappa.upper.toFixed(2)} (bootstrap, ${formatInt(score.kappa.resamples)} resamples, seed ${score.kappa.seed})`}
           />
           <StatTile
-            label="On the policy excerpts only"
+            label="Keyword rules: policy excerpts only"
             value={formatPercent(score.policyAgreement.estimate, 0)}
-            note={`${pctInterval(score.policyAgreement, 0)} of ${score.policyAgreement.n}`}
+            note={`95% CI ${formatPercent(score.policyAgreement.lower, 0)} to ${formatPercent(score.policyAgreement.upper, 0)} (Wilson), n = ${score.policyAgreement.n} with a policy gold label`}
           />
           <StatTile
             label="Gold set"
@@ -178,10 +178,30 @@ export default function TopicsPage() {
               </li>
             ))}
           </ol>
+          {/* Phones: one card per topic. */}
+          <ul
+            className="divide-y divide-border/70 rounded-lg border border-border sm:hidden"
+            aria-label="Codebook, gold counts and keyword-rule accuracy by topic"
+          >
+            {goldCounts.map((t) => (
+              <li key={t.id} className="space-y-1 px-3 py-3 text-sm">
+                <p className="flex items-baseline justify-between gap-3">
+                  <span className="font-medium">{t.label}</span>
+                  <span className="font-mono text-[0.68rem] text-muted-foreground">{t.id}</span>
+                </p>
+                <p className="text-xs text-muted-foreground">{t.covers}</p>
+                <p className="tabular text-xs">
+                  Gold {t.n} · rules precision{" "}
+                  {t.rules && t.rules.predicted ? formatPercent(t.rules.precision, 0) : "–"} ·
+                  recall {t.rules && t.rules.support ? formatPercent(t.rules.recall, 0) : "–"}
+                </p>
+              </li>
+            ))}
+          </ul>
           <div
-            className="overflow-x-auto rounded-lg border border-border"
+            className="hidden overflow-x-auto rounded-lg border border-border sm:block"
             role="region"
-            aria-label="Codebook, gold counts and keyword-rule accuracy by topic (scrolls sideways on small screens)"
+            aria-label="Codebook, gold counts and keyword-rule accuracy by topic"
             tabIndex={0}
           >
             <table className="w-full min-w-[44rem] text-left text-sm">
@@ -275,8 +295,45 @@ export default function TopicsPage() {
           <summary className="cursor-pointer font-medium">
             Show all {EVAL_ITEMS.length} excerpts with their gold and keyword labels
           </summary>
+          {/* Phones: one entry per excerpt. */}
+          <ol
+            className="mt-3 max-h-[40rem] divide-y divide-border/70 overflow-auto rounded-md border border-border sm:hidden"
+            aria-label="The gold set"
+            tabIndex={0}
+          >
+            {EVAL_ITEMS.map((it, k) => (
+              <li key={it.id} className="space-y-1.5 px-3 py-3">
+                <p>
+                  <span className="font-mono text-[0.7rem] text-muted-foreground">
+                    {it.id} · {it.cycle}
+                  </span>{" "}
+                  <span className="font-serif">{it.excerpt}</span>{" "}
+                  <SourceLink href={it.url} className="text-xs">
+                    Source
+                  </SourceLink>
+                </p>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+                  <dt className="text-muted-foreground">Gold</dt>
+                  <dd>{topicLabel(it.gold)}</dd>
+                  <dt className="text-muted-foreground">Rules</dt>
+                  <dd>
+                    {topicLabel(rules[k].topic)}
+                    {rules[k].matches.length ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        ({rules[k].matches.map((m) => m.phrase).join(", ")})
+                      </span>
+                    ) : null}
+                  </dd>
+                </dl>
+                {it.note ? (
+                  <p className="text-xs text-muted-foreground">Coder&apos;s note: {it.note}</p>
+                ) : null}
+              </li>
+            ))}
+          </ol>
           <div
-            className="relative mt-3 max-h-[40rem] overflow-auto rounded-md border border-border"
+            className="relative mt-3 hidden max-h-[40rem] overflow-auto rounded-md border border-border sm:block"
             role="region"
             aria-label="The gold set"
             tabIndex={0}

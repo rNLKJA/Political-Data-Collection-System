@@ -204,13 +204,13 @@ export default function ReadabilityPage() {
         </Panel>
 
         <Callout title="Part of this trend is in the transcripts">
-          The grade falls by about {formatDecimal(Math.abs(r.general.trend.perDecade.estimate), 1)}{" "}
-          a decade in general-election debates, and the interval is well clear of zero. But the
-          transcripts were made differently over time: the early ones were set by the Government
-          Printing Office and newspapers, the recent ones by networks and transcription services
-          with shorter sentences. The two transcripts of the same 2000 debates below differ by up to{" "}
-          {formatDecimal(Math.abs(maxTwin.gradeA - maxTwin.gradeB), 1)} grade levels for one
-          speaker, about{" "}
+          The grade falls by about {formatDecimal(Math.abs(r.general.trend.perDecade.estimate), 2)}{" "}
+          grade levels a decade in general-election debates, and the interval is well clear of zero.
+          But the transcripts were made differently over time: the early ones were set by the
+          Government Printing Office and newspapers, the recent ones by networks and transcription
+          services with shorter sentences. The two transcripts of the same 2000 debates below differ
+          by up to {formatDecimal(Math.abs(maxTwin.gradeA - maxTwin.gradeB), 1)} grade levels for
+          one speaker, about{" "}
           {formatDecimal(
             Math.abs(maxTwin.gradeA - maxTwin.gradeB) /
               Math.abs(r.general.trend.perDecade.estimate),
@@ -310,10 +310,44 @@ export default function ReadabilityPage() {
         className="mt-16"
         description={`The archive holds two transcripts of ${twinEvents.length} events from January 2000, with almost identical word counts. Same speakers, same words; only the transcription differs.`}
       >
+        {/* Phones: one card per speaker. */}
+        <ul
+          className="divide-y divide-border/70 rounded-lg border border-border sm:hidden"
+          aria-label="Candidates' reading grade in two transcripts of the same debate"
+        >
+          {twins.map((t) => (
+            <li key={`${t.date}-${t.speaker}`} className="space-y-1.5 px-3 py-3 text-sm">
+              <p className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span className="font-medium">{t.speaker}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatDate(t.date)}{" "}
+                  <SourceLink href={t.urlA} className="text-xs">
+                    A
+                  </SourceLink>{" "}
+                  <SourceLink href={t.urlB} className="text-xs">
+                    B
+                  </SourceLink>
+                </span>
+              </p>
+              <dl className="tabular grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+                <dt className="text-muted-foreground">Words (A / B)</dt>
+                <dd>
+                  {formatInt(t.wordsA)} / {formatInt(t.wordsB)}
+                </dd>
+                <dt className="text-muted-foreground">Grade (A / B)</dt>
+                <dd>
+                  {formatDecimal(t.gradeA, 2)} / {formatDecimal(t.gradeB, 2)}
+                </dd>
+                <dt className="text-muted-foreground">Difference</dt>
+                <dd className="font-medium">{signed(t.gradeB - t.gradeA, 2)}</dd>
+              </dl>
+            </li>
+          ))}
+        </ul>
         <div
-          className="relative overflow-x-auto rounded-lg border border-border"
+          className="relative hidden overflow-x-auto rounded-lg border border-border sm:block"
           role="region"
-          aria-label="Twin transcripts (scrolls sideways on small screens)"
+          aria-label="Twin transcripts"
           tabIndex={0}
         >
           <table className="w-full min-w-[38rem] text-left text-sm">

@@ -61,6 +61,7 @@ export function Callout({
 }) {
   return (
     <aside
+      aria-label={title}
       className={cn(
         "flex gap-3 rounded-lg border border-border bg-secondary/50 px-4 py-3 text-sm leading-relaxed",
         className,

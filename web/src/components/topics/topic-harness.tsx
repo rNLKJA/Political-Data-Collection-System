@@ -189,7 +189,7 @@ export function TopicHarness({ items }: { items: HarnessItem[] }) {
       <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="font-serif text-xl">Run the comparison</h3>
+            <h2 className="font-serif text-xl">Run the comparison</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
               Draw a seeded sample of the gold set, ask a model for one label per excerpt, and
               compare it with the keyword rules on exactly the same excerpts.
@@ -635,8 +635,42 @@ function RunResults({
         recorded in the audit log as an edit; it never changes the evaluation.
       </p>
 
+      {/* Phones: one entry per excerpt. */}
+      <ol
+        className="max-h-[36rem] divide-y divide-border/70 overflow-auto border-t border-border sm:hidden"
+        aria-label="Labels for each excerpt"
+        tabIndex={0}
+      >
+        {run.items.map((it) => {
+          const scored = scoredIds.has(it.id);
+          return (
+            <li key={it.id} className={cn("space-y-2 px-4 py-3 text-sm", !scored && "opacity-70")}>
+              <ExcerptText item={it} />
+              <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 text-xs">
+                <dt className="text-muted-foreground">Gold</dt>
+                <dd>{topicLabel(it.gold)}</dd>
+                <dt className="text-muted-foreground">Rules</dt>
+                <dd>
+                  <Verdict ok={it.rules === it.gold} text={topicLabel(it.rules)} />
+                </dd>
+                <dt className="text-muted-foreground">{name}</dt>
+                <dd>
+                  <ModelLabel
+                    item={it}
+                    scored={scored}
+                    ai={run.result.labels[it.id] ?? NO_ANSWER}
+                    editable={scored && reviewable.has(run.result.entryOf[it.id] ?? "")}
+                    edit={edits[it.id]}
+                    setEdits={setEdits}
+                  />
+                </dd>
+              </dl>
+            </li>
+          );
+        })}
+      </ol>
       <div
-        className="relative max-h-[36rem] overflow-auto border-t border-border"
+        className="relative hidden max-h-[36rem] overflow-auto border-t border-border sm:block"
         role="region"
         aria-label="Labels for each excerpt"
         tabIndex={0}
@@ -664,57 +698,27 @@ function RunResults({
           <tbody>
             {run.items.map((it) => {
               const scored = scoredIds.has(it.id);
-              const ai = run.result.labels[it.id] ?? NO_ANSWER;
-              const editable = scored && reviewable.has(run.result.entryOf[it.id] ?? "");
               return (
                 <tr
                   key={it.id}
                   className={cn("border-t border-border/70 align-top", !scored && "opacity-70")}
                 >
                   <td className="max-w-[26rem] px-3 py-2">
-                    <span className="font-mono text-[0.7rem] text-muted-foreground">{it.id}</span>{" "}
-                    <span className="font-serif">{it.excerpt}</span>{" "}
-                    <SourceLink href={it.url} className="text-xs">
-                      Source
-                    </SourceLink>
+                    <ExcerptText item={it} />
                   </td>
                   <td className="px-3 py-2 text-xs whitespace-nowrap">{topicLabel(it.gold)}</td>
                   <td className="px-3 py-2 text-xs">
                     <Verdict ok={it.rules === it.gold} text={topicLabel(it.rules)} />
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    {scored ? (
-                      <Verdict ok={ai === it.gold} text={label(ai)} />
-                    ) : (
-                      <span className="text-muted-foreground">
-                        Left out: the request failed or was not sent
-                      </span>
-                    )}
-                    {editable ? (
-                      <label className="mt-1 block">
-                        <span className="sr-only">Correct the label for {it.id}</span>
-                        <select
-                          value={edits[it.id] ?? ""}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setEdits((cur) => {
-                              const next = { ...cur };
-                              if (isTopicId(v)) next[it.id] = v;
-                              else delete next[it.id];
-                              return next;
-                            });
-                          }}
-                          className="mt-0.5 h-7 max-w-[11rem] rounded border border-input bg-card px-1 text-xs"
-                        >
-                          <option value="">Keep</option>
-                          {CODEBOOK.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
+                    <ModelLabel
+                      item={it}
+                      scored={scored}
+                      ai={run.result.labels[it.id] ?? NO_ANSWER}
+                      editable={scored && reviewable.has(run.result.entryOf[it.id] ?? "")}
+                      edit={edits[it.id]}
+                      setEdits={setEdits}
+                    />
                   </td>
                 </tr>
               );
@@ -739,5 +743,69 @@ function Verdict({ ok, text }: { ok: boolean; text: string }) {
         <span className="sr-only">{ok ? " (matches gold)" : " (differs from gold)"}</span>
       </span>
     </span>
+  );
+}
+
+function ExcerptText({ item }: { item: HarnessItem }) {
+  return (
+    <>
+      <span className="font-mono text-[0.7rem] text-muted-foreground">{item.id}</span>{" "}
+      <span className="font-serif">{item.excerpt}</span>{" "}
+      <SourceLink href={item.url} className="text-xs">
+        Source
+      </SourceLink>
+    </>
+  );
+}
+
+/** The labeller's answer for one excerpt, with a correction menu when the call can be reviewed. */
+function ModelLabel({
+  item,
+  scored,
+  ai,
+  editable,
+  edit,
+  setEdits,
+}: {
+  item: HarnessItem;
+  scored: boolean;
+  ai: AiLabel;
+  editable: boolean;
+  edit: TopicId | undefined;
+  setEdits: (f: (e: Record<string, TopicId>) => Record<string, TopicId>) => void;
+}) {
+  return (
+    <>
+      {scored ? (
+        <Verdict ok={ai === item.gold} text={label(ai)} />
+      ) : (
+        <span className="text-muted-foreground">Left out: the request failed or was not sent</span>
+      )}
+      {editable ? (
+        <label className="mt-1 block">
+          <span className="sr-only">Correct the label for {item.id}</span>
+          <select
+            value={edit ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              setEdits((cur) => {
+                const next = { ...cur };
+                if (isTopicId(v)) next[item.id] = v;
+                else delete next[item.id];
+                return next;
+              });
+            }}
+            className="mt-0.5 h-7 max-w-[11rem] rounded border border-input bg-card px-1 text-xs"
+          >
+            <option value="">Keep</option>
+            {CODEBOOK.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+    </>
   );
 }

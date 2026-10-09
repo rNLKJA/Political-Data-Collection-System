@@ -56,7 +56,7 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
-          <dl className="grid grid-cols-2 content-start gap-x-6 gap-y-7 border-t border-rule/60 pt-6 lg:border-t-0 lg:border-l lg:pt-1 lg:pl-8">
+          <div className="grid grid-cols-2 content-start gap-x-6 gap-y-7 border-t border-rule/60 pt-6 lg:border-t-0 lg:border-l lg:pt-1 lg:pl-8">
             <StatTile
               label="Campaign documents"
               value={formatInt(o.documents)}
@@ -77,7 +77,7 @@ export default function HomePage() {
               value={formatInt(o.debateTurns)}
               note={`${formatCompact(o.debateWords)} words, 1960 to 2024`}
             />
-          </dl>
+          </div>
         </div>
       </section>
 
