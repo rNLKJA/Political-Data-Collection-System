@@ -240,7 +240,10 @@ function EntryCard({ entry: e }: { entry: AuditEntry }) {
             {e.decision === "pending" ? "awaiting review" : e.decision}
           </span>
         )}
-        {!e.error ? <AiGeneratedBadge simulated={simulated} className="ml-auto" /> : null}
+        {/* any text that came back from a model is AI output, even when it was unusable */}
+        {e.output != null || e.raw_output != null ? (
+          <AiGeneratedBadge simulated={simulated} className="ml-auto" />
+        ) : null}
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
         {meta.run_id ? `Run ${meta.run_id.slice(0, 8)}` : null}

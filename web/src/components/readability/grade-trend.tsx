@@ -22,6 +22,8 @@ export interface TrendGroup {
   color: string;
   dots: TrendDot[];
   band: Array<{ year: number; fit: number; lower: number; upper: number }>;
+  /** election cycles in the group (the trend's resampled clusters) */
+  cycles: number;
   byCycle: Array<{
     cycle: number;
     n: number;
@@ -34,8 +36,8 @@ export interface TrendGroup {
 
 /**
  * Candidates' reading grade, one dot per debate, with the fitted linear trend
- * and its 95% bootstrap band, and per-cycle means with 95% intervals where a
- * cycle has five or more debates.
+ * and its 95% band (whole cycles resampled), and per-cycle means with 95%
+ * intervals where a cycle has five or more debates.
  */
 export function GradeTrend({ groups }: { groups: TrendGroup[] }) {
   const [key, setKey] = useState<TrendGroup["key"]>(groups[0].key);
@@ -96,15 +98,15 @@ export function GradeTrend({ groups }: { groups: TrendGroup[] }) {
         <span className="tabular font-medium text-foreground">
           {formatDecimal(g.perDecade.estimate, 2)} grade levels
         </span>{" "}
-        (95% CI {formatDecimal(g.perDecade.lower, 2)} to {formatDecimal(g.perDecade.upper, 2)}),{" "}
-        {g.dots.length} debates.
+        (95% CI {formatDecimal(g.perDecade.lower, 2)} to {formatDecimal(g.perDecade.upper, 2)},
+        cycles resampled), {g.dots.length} debates in {g.cycles} cycles.
       </p>
       <div ref={ref} className="relative mt-3">
         <svg
           width={width}
           height={height}
           role="img"
-          aria-label={`Candidates' Flesch-Kincaid grade in ${g.label.toLowerCase()} debates, 1960 to 2024: one dot per debate, a fitted trend of ${formatDecimal(g.perDecade.estimate, 2)} grade levels per decade with a 95% band, and per-cycle means with intervals. The numbers are in the table below.`}
+          aria-label={`Candidates' Flesch-Kincaid grade in ${g.label.toLowerCase()} debates, 1960 to 2024: one dot per debate, a fitted trend of ${formatDecimal(g.perDecade.estimate, 2)} grade levels per decade with a 95% band${g.byCycle.some((c) => c.lower !== null) ? ", and per-cycle means with intervals" : ""}. The numbers are in the table below.`}
           className="block max-w-full overflow-visible"
           onMouseLeave={() => setHover(null)}
         >
@@ -189,10 +191,14 @@ export function GradeTrend({ groups }: { groups: TrendGroup[] }) {
         <span className="flex items-center gap-1.5">
           <LegendSwatch color={g.color} shape="line" /> Linear trend, 95% band
         </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="inline-block size-2 rotate-45 bg-foreground" /> Cycle mean,
-          95% interval (five or more debates)
-        </span>
+        {g.byCycle.some((c) => c.lower !== null) ? (
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden className="inline-block size-2 rotate-45 bg-foreground" /> Cycle mean,
+            95% interval (five or more debates)
+          </span>
+        ) : (
+          <span>No cycle has five debates, so no cycle means are marked.</span>
+        )}
       </div>
     </div>
   );

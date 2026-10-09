@@ -16,12 +16,15 @@ import {
   batches,
   buildSystemPrompt,
   buildUserMessage,
+  decisionPatches,
   estimateRunTokens,
   labelSchema,
   labelsForBatch,
   NO_ANSWER,
   runTopicLabelling,
 } from "./topic-labels";
+import { comparePaired, scoreLabeller } from "@/lib/topics/evaluation";
+import type { TopicId } from "@/lib/topics/codebook";
 
 const KEY = "sk-ant-api03-TOPIC-TEST-KEY-not-real-1234";
 const items = EVAL_ITEMS.slice(0, 12).map((i) => ({ id: i.id, excerpt: i.excerpt }));
@@ -156,8 +159,138 @@ describe("running a labelling job", () => {
     expect(res.labels[ids[0]]).toBe(NO_ANSWER);
     expect(res.labels[ids[10]]).toBe("energy");
     expect(res.failures).toEqual([expect.objectContaining({ batch: 1, kind: "invalid_output" })]);
+    // the model answered, unusably: its excerpts are scored (as no answer), not excluded
+    expect(res.scoredIds).toEqual(ids);
+    expect(res.excludedIds).toEqual([]);
+    // but there is nothing in that call a person could accept or correct
+    expect(res.reviewableEntryIds).toEqual([res.entryIds[1]]);
     const failed = (await store.list()).find((e) => e.error);
     expect(failed?.raw_output).toBe("not json");
+  });
+
+  it("leaves excerpts out of the scores when their request fails, instead of scoring them wrong", async () => {
+    const many = EVAL_ITEMS.slice(0, 40);
+    const ids = many.map((i) => i.id);
+    const gold = (b: number) =>
+      JSON.stringify({
+        labels: many.slice(b * 10, b * 10 + 10).map((i) => ({ id: i.id, topic: i.gold })),
+      });
+    // a perfect labeller whose connection drops after two of four batches
+    const { impl, calls } = mockFetch([
+      jsonResponse(200, anthropicMessage(gold(0))),
+      jsonResponse(200, anthropicMessage(gold(1))),
+      new TypeError("Failed to fetch"),
+    ]);
+    const store = createMemoryAuditStore();
+    const res = await runTopicLabelling(
+      many.map((i) => ({ id: i.id, excerpt: i.excerpt })),
+      {
+        runId: "run-net",
+        provider: "anthropic",
+        model: "claude-haiku-4-5",
+        apiKey: KEY,
+        seed: 1,
+        fetchImpl: impl,
+        store,
+        sleep: noSleep,
+      },
+    );
+    expect(calls).toHaveLength(3);
+    expect(res.stopped?.kind).toBe("network");
+    expect(res.scoredIds).toEqual(ids.slice(0, 20));
+    expect(res.excludedIds).toEqual(ids.slice(20));
+    expect(res.reviewableEntryIds).toEqual(res.entryIds.slice(0, 2));
+    expect(res.entryOf[ids[25]]).toBe(res.entryIds[2]);
+    expect(res.entryOf[ids[35]]).toBeUndefined();
+
+    // scored on the answered subset, the perfect labeller is perfect, and never "worse than the rules"
+    const scored = many.slice(0, 20);
+    const g = scored.map((i) => i.gold);
+    const ai = scored.map((i) => res.labels[i.id] as TopicId);
+    expect(scoreLabeller(g, ai, { resamples: 200 }).agreement.estimate).toBe(1);
+    const rules = scored.map(() => "none" as TopicId);
+    expect(comparePaired(g, ai, rules, { resamples: 200 }).agreementDiff.estimate).toBeGreaterThan(
+      0,
+    );
+
+    // a decision touches only the calls that answered; the failed call stays pending
+    const patches = decisionPatches(res, ids, {}, "accepted");
+    expect(patches.map((p) => p.entryId)).toEqual(res.entryIds.slice(0, 2));
+    for (const p of patches) await store.decide(p.entryId, p.patch);
+    const log = await store.list();
+    const failedEntry = log.find((e) => e.error);
+    expect(failedEntry?.error?.kind).toBe("network");
+    expect(failedEntry?.decision).toBe("pending");
+    expect(log.filter((e) => e.decision === "accepted")).toHaveLength(2);
+  });
+
+  it("excludes a rejected request but carries on, and records corrections only where there are answers", async () => {
+    const ids = items.map((i) => i.id);
+    const { impl } = mockFetch([
+      jsonResponse(400, { error: { type: "invalid_request_error", message: "bad" } }),
+      jsonResponse(200, anthropicMessage(answer(ids.slice(10), "energy"))),
+    ]);
+    const res = await runTopicLabelling(items, {
+      runId: "run-400",
+      provider: "anthropic",
+      model: "claude-haiku-4-5",
+      apiKey: KEY,
+      seed: 1,
+      fetchImpl: impl,
+      store: createMemoryAuditStore(),
+      sleep: noSleep,
+    });
+    expect(res.stopped).toBeNull();
+    expect(res.failures).toEqual([expect.objectContaining({ batch: 1, kind: "bad_request" })]);
+    expect(res.excludedIds).toEqual(ids.slice(0, 10));
+    expect(res.scoredIds).toEqual(ids.slice(10));
+    const patches = decisionPatches(
+      res,
+      ids,
+      { [ids[0]]: "health", [ids[11]]: "defence" },
+      "edited",
+    );
+    expect(patches).toEqual([
+      {
+        entryId: res.entryIds[1],
+        patch: {
+          decision: "edited",
+          edited_output: {
+            labels: [
+              { id: ids[10], topic: "energy" },
+              { id: ids[11], topic: "defence" },
+            ],
+          },
+        },
+      },
+    ]);
+    expect(decisionPatches(res, ids, {}, "rejected")).toEqual([
+      { entryId: res.entryIds[1], patch: { decision: "rejected" } },
+    ]);
+  });
+
+  it("excludes everything after the visitor presses Stop", async () => {
+    const ids = items.map((i) => i.id);
+    const controller = new AbortController();
+    const abortError = new DOMException("The operation was aborted.", "AbortError");
+    const { impl } = mockFetch([
+      jsonResponse(200, anthropicMessage(answer(ids.slice(0, 10), "health"))),
+      abortError,
+    ]);
+    const res = await runTopicLabelling(items, {
+      runId: "run-stop",
+      provider: "anthropic",
+      model: "claude-haiku-4-5",
+      apiKey: KEY,
+      seed: 1,
+      signal: controller.signal,
+      fetchImpl: impl,
+      store: createMemoryAuditStore(),
+      sleep: noSleep,
+    });
+    expect(res.stopped?.kind).toBe("aborted");
+    expect(res.scoredIds).toEqual(ids.slice(0, 10));
+    expect(res.excludedIds).toEqual(ids.slice(10));
   });
 
   it("stops at a rejected key and logs the failure", async () => {
@@ -178,6 +311,11 @@ describe("running a labelling job", () => {
     expect(calls).toHaveLength(1);
     expect(res.stopped?.kind).toBe("invalid_key");
     expect(Object.values(res.labels).every((l) => l === NO_ANSWER)).toBe(true);
+    // nothing reached the model, so nothing is scored and nothing can be reviewed
+    expect(res.scoredIds).toEqual([]);
+    expect(res.excludedIds).toEqual(items.map((i) => i.id));
+    expect(res.reviewableEntryIds).toEqual([]);
+    expect(decisionPatches(res, res.excludedIds, {}, "accepted")).toEqual([]);
     const [entry] = await store.list();
     expect(entry.error?.kind).toBe("invalid_key");
     expect(JSON.stringify(entry)).not.toContain(KEY);
@@ -199,6 +337,8 @@ describe("running a labelling job", () => {
     });
     expect(calls).toHaveLength(0);
     expect(Object.values(res.labels).every((l) => TOPIC_IDS.includes(l as never))).toBe(true);
+    expect(res.scoredIds).toHaveLength(items.length);
+    expect(res.reviewableEntryIds).toEqual(res.entryIds);
     const log = await store.list();
     expect(log.every((e) => e.provider === "mock" && e.model === MOCK_MODEL_ID)).toBe(true);
     expect(log[0].input.meta).toMatchObject({ simulated: true });

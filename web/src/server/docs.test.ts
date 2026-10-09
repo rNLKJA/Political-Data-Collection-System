@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { decisionSlug, firstTable, headingId, resolveDocHref, splitTitle } from "@/lib/docs";
-import { EVAL_ITEMS } from "@/lib/topics/data";
+import { EVAL_ITEMS, EXCERPTS_NAMING_CANDIDATE, GOLD_META } from "@/lib/topics/data";
 import { scoreLabeller } from "@/lib/topics/evaluation";
 import { keywordLabel } from "@/lib/topics/keyword-rules";
 
@@ -31,7 +31,14 @@ describe("docs mirrored into web/content", () => {
 
   it("parses every decision record in the house format", () => {
     const records = listDecisions();
-    expect(records.map((r) => r.id)).toEqual(["DR-001", "DR-002", "DR-003", "DR-004"]);
+    expect(records.map((r) => r.id)).toEqual([
+      "DR-001",
+      "DR-002",
+      "DR-003",
+      "DR-004",
+      "DR-005",
+      "DR-006",
+    ]);
     const sections = [
       "## Context",
       "## Decision",
@@ -81,7 +88,33 @@ describe("docs mirrored into web/content", () => {
     );
     expect(card.body).not.toMatch(/—/);
     expect(card.body).not.toMatch(/\bcompliant\b/i);
+    // the disclosure of excerpts that name their candidate uses the computed count
+    expect(squashed).toContain(
+      `${EXCERPTS_NAMING_CANDIDATE} of the ${EVAL_ITEMS.length} excerpts name the candidate`,
+    );
   });
+
+  it.runIf(existsSync(docsDir))(
+    "never calls a draft gold set hand-labelled in visitor-facing text or docs",
+    () => {
+      if (GOLD_META.status !== "draft") return;
+      const files = [
+        path.join(docsDir, "..", "README.md"),
+        path.join(docsDir, "model-card.md"),
+        path.join(docsDir, "..", "scripts", "build_topic_eval.py"),
+        path.join(process.cwd(), "src", "lib", "site.ts"),
+        path.join(process.cwd(), "src", "lib", "topics", "data.ts"),
+        path.join(process.cwd(), "src", "app", "topics", "page.tsx"),
+        path.join(process.cwd(), "src", "app", "methods", "page.tsx"),
+        path.join(process.cwd(), "src", "app", "page.tsx"),
+      ];
+      for (const f of files) {
+        expect(readFileSync(f, "utf8"), f).not.toMatch(
+          /hand[- ](labell?ed|labell?ing|assigned|written)|(labell?ed|written|coded) by hand/i,
+        );
+      }
+    },
+  );
 });
 
 describe("doc helpers", () => {

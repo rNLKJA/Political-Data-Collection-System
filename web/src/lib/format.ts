@@ -33,9 +33,20 @@ export function formatInt(n: number): string {
   return intFmt.format(Math.round(n));
 }
 
+/** Fixed decimals with a typographic minus sign (U+2212), and no "−0.0". */
 export function formatDecimal(n: number | null | undefined, digits = 1): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "–";
-  return n.toFixed(digits);
+  const s = n.toFixed(digits);
+  if (/^-0(\.0*)?$/.test(s)) return s.slice(1);
+  return s.replace("-", "\u2212");
+}
+
+/** "+0.12" / "−0.75" / "0.00": an explicit sign for differences and slopes. */
+export function formatSigned(n: number | null | undefined, digits = 1): string {
+  const s = formatDecimal(n, digits);
+  return n !== null && n !== undefined && !Number.isNaN(n) && n > 0 && !/^0(\.0*)?$/.test(s)
+    ? `+${s}`
+    : s;
 }
 
 export function formatPercent(share: number, digits = 1): string {

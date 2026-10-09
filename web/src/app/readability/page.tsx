@@ -6,9 +6,10 @@ import { Callout, SourceLink, StatTile, TableView } from "@/components/common/bi
 import { PageIntro, Panel, Section } from "@/components/common/page-intro";
 import { GradeTrend, type TrendGroup } from "@/components/readability/grade-trend";
 import { CYCLES } from "@/lib/corpus-types";
-import { formatDate, formatDecimal, formatInt } from "@/lib/format";
+import { formatDate, formatDecimal, formatInt, formatSigned } from "@/lib/format";
 import {
   fractional,
+  MIN_CLUSTERS_FOR_INTERVAL,
   MIN_GROUP_FOR_INTERVAL,
   READABILITY_RESAMPLES,
   REGISTER_LABEL,
@@ -21,7 +22,7 @@ import { readabilitySummary } from "@/server/readability";
 export const metadata: Metadata = {
   title: "Readability, with intervals",
   description:
-    "Flesch-Kincaid reading grade of debate transcripts (1960 to 2024) and campaign documents (2016 to 2024) with bootstrap confidence intervals, and a demonstration of how much transcription alone moves the number.",
+    "Flesch-Kincaid reading grade of debate transcripts (1960 to 2024) and campaign documents (2016 to 2024) with cluster-bootstrap and t intervals, and a demonstration of how much transcription alone moves the number.",
 };
 
 const REGISTER_COLOR: Record<Register, string> = {
@@ -30,8 +31,7 @@ const REGISTER_COLOR: Record<Register, string> = {
   address: "var(--series-3)",
 };
 
-const signed = (v: number, d = 2) =>
-  `${v > 0 ? "+" : v < 0 ? "−" : ""}${formatDecimal(Math.abs(v), d)}`;
+const signed = (v: number, d = 2) => formatSigned(v, d);
 
 export default function ReadabilityPage() {
   const r = readabilitySummary();
@@ -57,6 +57,7 @@ export default function ReadabilityPage() {
     color,
     dots: dots(key),
     band: data.trend.band,
+    cycles: data.trend.cycles,
     byCycle: data.byCycle.map((c) => ({
       cycle: c.cycle,
       n: c.n,
@@ -78,7 +79,7 @@ export default function ReadabilityPage() {
         key: `${reg}-${cycle}`,
         group: REGISTER_LABEL[reg],
         label: <span className="tabular">{cycle}</span>,
-        note: `${formatInt(c.n)} docs · ${formatDecimal(c.meanWps, 1)} words/sentence`,
+        note: `${formatInt(c.n)} docs from ${c.speakers} speakers · ${formatDecimal(c.meanWps, 1)} words/sentence`,
         estimate: c.meanGrade,
         lower: c.grade?.lower ?? null,
         upper: c.grade?.upper ?? null,
@@ -99,27 +100,27 @@ export default function ReadabilityPage() {
       key: "gap",
       label: "Transcribed minus written",
       note: `mean over ${g.speakers.length} speakers`,
-      estimate: g.gap.estimate,
-      lower: g.gap.lower,
-      upper: g.gap.upper,
+      estimate: g.gapT.estimate,
+      lower: g.gapT.lower,
+      upper: g.gapT.upper,
       color: "var(--role-candidate)",
     },
     {
       key: "sentence",
       label: "… from sentence length",
       note: "0.39 × difference in words per sentence",
-      estimate: g.sentencePart.estimate,
-      lower: g.sentencePart.lower,
-      upper: g.sentencePart.upper,
+      estimate: g.sentencePartT.estimate,
+      lower: g.sentencePartT.lower,
+      upper: g.sentencePartT.upper,
       color: "var(--series-1)",
     },
     {
       key: "word",
       label: "… from word length",
       note: "11.8 × difference in syllables per word",
-      estimate: g.wordPart.estimate,
-      lower: g.wordPart.lower,
-      upper: g.wordPart.upper,
+      estimate: g.wordPartT.estimate,
+      lower: g.wordPartT.lower,
+      upper: g.wordPartT.upper,
       color: "var(--series-2)",
     },
   ];
@@ -149,17 +150,17 @@ export default function ReadabilityPage() {
           <StatTile
             label="General and VP debates, per decade"
             value={signed(r.general.trend.perDecade.estimate)}
-            note={`95% CI ${signed(r.general.trend.perDecade.lower)} to ${signed(r.general.trend.perDecade.upper)} · ${r.general.trend.n} debates`}
+            note={`95% CI ${signed(r.general.trend.perDecade.lower)} to ${signed(r.general.trend.perDecade.upper)} · ${r.general.trend.n} debates in ${r.general.trend.cycles} cycles, cycles resampled`}
           />
           <StatTile
             label="Primary debates, per decade"
             value={signed(r.primary.trend.perDecade.estimate)}
-            note={`95% CI ${signed(r.primary.trend.perDecade.lower)} to ${signed(r.primary.trend.perDecade.upper)} · ${r.primary.trend.n} debates`}
+            note={`95% CI ${signed(r.primary.trend.perDecade.lower)} to ${signed(r.primary.trend.perDecade.upper)} · ${r.primary.trend.n} debates in ${r.primary.trend.cycles} cycles, cycles resampled`}
           />
           <StatTile
             label="Same speaker, transcribed vs written"
-            value={signed(g.gap.estimate, 1)}
-            note={`95% CI ${signed(g.gap.lower, 1)} to ${signed(g.gap.upper, 1)} grades · ${g.speakers.length} speakers, paired`}
+            value={signed(g.gapT.estimate, 1)}
+            note={`95% CI ${signed(g.gapT.lower, 1)} to ${signed(g.gapT.upper, 1)} grades (t) · ${g.speakers.length} speakers, paired; ${g.sign.negative} of ${g.speakers.length} lower`}
           />
           <StatTile
             label="Same debate, two transcripts"
@@ -174,12 +175,15 @@ export default function ReadabilityPage() {
           </h2>
           <p className="mt-1 mb-4 max-w-3xl text-sm text-muted-foreground">
             Each dot is the grade of everything the candidates said in one debate. The dashed line
-            is a least-squares trend; its band and the per-decade interval come from resampling
-            whole debates ({formatInt(READABILITY_RESAMPLES)} resamples, seed {DEFAULT_SEED}).
+            is a least-squares trend. Debates in one election cycle share candidates and a
+            transcription source, so its band and the per-decade interval resample whole cycles, not
+            single debates ({formatInt(READABILITY_RESAMPLES)} resamples, seed {DEFAULT_SEED}). With{" "}
+            {r.primary.trend.cycles} to {r.general.trend.cycles} cycles, even these intervals are
+            approximate.
           </p>
           <GradeTrend groups={groups} />
           <TableView
-            caption="Candidates' mean reading grade per election cycle, with 95% bootstrap intervals"
+            caption="Candidates' mean reading grade per election cycle, with 95% bootstrap intervals over that cycle's debates (five or more)"
             head={["Cycle", "Debates", "General and VP: mean (95% CI)", "Primary: mean (95% CI)"]}
             rows={[...new Set(r.debates.map((d) => d.cycle))]
               .sort((a, b) => a - b)
@@ -212,8 +216,8 @@ export default function ReadabilityPage() {
               Math.abs(r.general.trend.perDecade.estimate),
             0,
           )}{" "}
-          decades of the trend. The intervals cover sampling of debates, not this transcription
-          effect.
+          decades of the trend. The intervals cover sampling of cycles and debates, not this
+          transcription effect.
         </Callout>
       </div>
 
@@ -225,10 +229,11 @@ export default function ReadabilityPage() {
         description={
           <>
             Mean grade per document (documents with 100 or more words in the candidate&apos;s own
-            voice), with 95% bootstrap intervals over documents; cells with fewer than{" "}
-            {MIN_GROUP_FOR_INTERVAL} documents get no interval. Document types are the
-            scraper&apos;s, from title words: releases and statements are written prose; remarks and
-            interviews are transcripts of speech.
+            voice). A campaign&apos;s documents share a style, so the 95% intervals resample
+            speakers, each with all of their documents, not single documents; cells with fewer than{" "}
+            {MIN_GROUP_FOR_INTERVAL} documents or {MIN_CLUSTERS_FOR_INTERVAL} speakers get no
+            interval. Document types are the scraper&apos;s, from title words: releases and
+            statements are written prose; remarks and interviews are transcripts of speech.
           </>
         }
       >
@@ -256,9 +261,10 @@ export default function ReadabilityPage() {
         description={
           <>
             For each speaker with at least {g.minDocs} graded documents of both kinds, the
-            difference between their transcribed and written texts; then the mean over speakers,
-            resampling speakers. Because the grade is linear in sentence length and word length, the
-            gap splits exactly into the two parts below.
+            difference between their transcribed and written texts; then the mean over the{" "}
+            {g.speakers.length} speakers with a t interval (at this size a percentile bootstrap runs
+            narrow). Because the grade is linear in sentence length and word length, the gap splits
+            exactly into the two parts below.
           </>
         }
       >
@@ -268,13 +274,16 @@ export default function ReadabilityPage() {
             domain={[-8, 1]}
             ticks={[-8, -6, -4, -2, 0]}
             zero={0}
-            caption="Within-speaker difference in grade (transcribed minus written) and its two parts, with 95% intervals"
+            caption="Within-speaker difference in grade (transcribed minus written) and its two parts, with 95% t intervals"
           />
           <p className="mt-4 text-sm text-muted-foreground">
-            {g.lower} of {g.speakers.length} speakers grade lower when transcribed; the standardised
-            paired difference is d<sub>z</sub> = {formatDecimal(g.dz, 2)}. Most of the gap comes
-            from sentence length, which in a transcript is the transcriber&apos;s choice of where to
-            put full stops.
+            {g.sign.negative} of {g.speakers.length} speakers grade lower when transcribed (exact
+            sign test p = {g.sign.p < 0.001 ? g.sign.p.toFixed(4) : g.sign.p.toFixed(3)}); the
+            standardised paired difference is d<sub>z</sub> = {formatDecimal(g.dz, 2)}. A percentile
+            bootstrap over speakers gives {signed(g.gap.lower, 1)} to {signed(g.gap.upper, 1)} for
+            the gap, a little narrower than the t interval shown. Most of the gap comes from
+            sentence length, which in a transcript is the transcriber&apos;s choice of where to put
+            full stops.
           </p>
           <details className="mt-3 text-sm">
             <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
@@ -302,7 +311,7 @@ export default function ReadabilityPage() {
         description={`The archive holds two transcripts of ${twinEvents.length} events from January 2000, with almost identical word counts. Same speakers, same words; only the transcription differs.`}
       >
         <div
-          className="overflow-x-auto rounded-lg border border-border"
+          className="relative overflow-x-auto rounded-lg border border-border"
           role="region"
           aria-label="Twin transcripts (scrolls sideways on small screens)"
           tabIndex={0}

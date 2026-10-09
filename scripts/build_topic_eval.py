@@ -12,10 +12,11 @@ Run from the repository root:  ``uv run scripts/build_topic_eval.py``
 
 Writes ``web/src/data/topic-eval-items.json``: a fixed, seeded sample of
 one-sentence excerpts from the campaign documents, 40 per election cycle.
-Each excerpt is a single sentence of 12 to 25 words in the candidate's own
-voice, so it stays within the site's 25-word quotation limit (DR-001). The
-gold labels live in a separate, hand-written file (``topic-gold.json``) so that
-re-running this script never touches them.
+Each excerpt is a single sentence of 12 to 25 words from the document's own
+text (``clean_document``; press round-ups can still quote others), so it stays
+within the site's 25-word quotation limit (DR-001). The gold labels live in a
+separate file (``topic-gold.json``), edited directly and never written by a
+script, so that re-running this script never touches them.
 
 Sampling, in order:
 

@@ -21,7 +21,7 @@ import { ANTHROPIC_MODELS, DEFAULT_OPENAI_MODEL } from "@/lib/ai/providers";
 import { DEFAULT_SEED } from "@/lib/stats/bootstrap";
 import { STABILITY_RESAMPLES } from "@/lib/stats/fw-stability";
 import { READABILITY_RESAMPLES } from "@/lib/readability-stats";
-import { EVAL_ITEMS, GOLD_META, SAMPLE_META } from "@/lib/topics/data";
+import { EVAL_ITEMS, EXCERPTS_NAMING_CANDIDATE, GOLD_META, SAMPLE_META } from "@/lib/topics/data";
 import { scoreLabeller } from "@/lib/topics/evaluation";
 import { KEYWORD_RULES_VERSION, keywordLabel } from "@/lib/topics/keyword-rules";
 
@@ -84,6 +84,10 @@ export default function MethodPage() {
   const concepts = getConcepts();
   const decisions = listDecisions();
   const readability = readabilitySummary();
+  const written2024 = readability.docs.cells.find(
+    (c) => c.cycle === 2024 && c.register === "written",
+  )!;
+  const namedCount = EXCERPTS_NAMING_CANDIDATE;
   const baseline = scoreLabeller(
     EVAL_ITEMS.map((i) => i.gold),
     EVAL_ITEMS.map((i) => keywordLabel(i.excerpt).topic),
@@ -570,9 +574,11 @@ rate  = k / N × 10,000      interval scaled the same way`}
               <p>
                 With {STABILITY_RESAMPLES} resamples a kept share has a Monte Carlo standard error
                 of at most {(100 * Math.sqrt(0.25 / STABILITY_RESAMPLES)).toFixed(1)} percentage
-                points. Separately, with {formatInt(o.vocabulary)} words tested at |z| = 1.96, about{" "}
-                {formatInt(Math.round(o.vocabulary * 0.05))} would cross the line by chance alone,
-                so the lists are rankings to explore, not a set of findings. Rationale and results:{" "}
+                points. Separately, a comparison tests every word used by either group (up to{" "}
+                {formatInt(o.vocabulary)}), and at |z| = 1.96 about 5% of the words tested would
+                cross the line even if the groups did not differ; the page shows that figure for
+                each comparison. The informative prior makes it a rough guide, but the point stands:
+                the lists are rankings to explore, not a set of findings. Rationale and results:{" "}
                 <Link
                   href="/methods/decisions/dr-003-term-statistics-method"
                   className="inline-link"
@@ -592,28 +598,58 @@ rate  = k / N × 10,000      interval scaled the same way`}
           >
             <div className="prose-archive">
               <p>
-                Every interval on{" "}
+                The rows behind{" "}
                 <Link href="/readability" className="inline-link">
                   Readability
                 </Link>{" "}
-                is a 95% percentile bootstrap ({formatInt(READABILITY_RESAMPLES)} resamples, seed{" "}
-                {DEFAULT_SEED}) that resamples the unit the claim is about: documents within a cycle
-                and kind of text, debates for a trend (the slope of a least-squares line per decade,
-                and a pointwise band for the fitted line), and speakers for the paired comparison of
-                each speaker&apos;s transcribed and written texts. Groups of fewer than five get a
-                point estimate and no interval.
+                are not independent. A campaign&apos;s documents share writers and a house style,
+                and the debates of one election cycle share candidates and a transcription source.
+                Resampling single documents or debates would treat them as independent and give
+                intervals that are too narrow, so the intervals resample clusters (a cluster
+                bootstrap, {formatInt(READABILITY_RESAMPLES)} resamples, seed {DEFAULT_SEED}): for
+                the mean grade of a cycle and kind of text, whole speakers with all their documents;
+                for a debate trend (the slope of a least-squares line per decade, and a pointwise
+                band for the fitted line), whole cycles with all their debates. Groups of fewer than
+                five documents or five speakers get a point estimate and no interval.
+              </p>
+              <p>
+                The difference is not small. For 2024 written releases ({formatInt(written2024.n)}{" "}
+                documents from {written2024.speakers} speakers) the speaker-level interval is{" "}
+                {minus(written2024.grade?.lower ?? Number.NaN, 2)} to{" "}
+                {minus(written2024.grade?.upper ?? Number.NaN, 2)}, several times wider than
+                resampling documents would suggest. For the primary-debate trend (
+                {readability.primary.trend.n} debates in {readability.primary.trend.cycles} cycles)
+                the cycle-level interval is {minus(readability.primary.trend.perDecade.lower, 2)} to{" "}
+                {minus(readability.primary.trend.perDecade.upper, 2)} grade levels per decade,
+                against {minus(readability.primary.trend.perDecadeDebates.lower, 2)} to{" "}
+                {minus(readability.primary.trend.perDecadeDebates.upper, 2)} if debates were
+                independent. With only {readability.primary.trend.cycles} to{" "}
+                {readability.general.trend.cycles} cycles, a cluster bootstrap is itself approximate
+                and can still run a little narrow. A cycle&apos;s own mean in the table resamples
+                that cycle&apos;s debates and describes that cycle only.
               </p>
               <p>
                 Because the grade is linear in words per sentence (WPS) and syllables per word
                 (SPW), a difference of mean grades splits exactly into a sentence-length part and a
                 word-length part. For the {readability.gap.speakers.length} speakers with enough of
-                both kinds of text, the mean gap is {minus(readability.gap.gap.estimate)} grade
-                levels (95% CI {minus(readability.gap.gap.lower)} to{" "}
-                {minus(readability.gap.gap.upper)}), of which{" "}
-                {minus(readability.gap.sentencePart.estimate)} comes from sentence length. These
-                intervals cover sampling, not measurement: they do not include the effect of who
-                transcribed a debate, which the page shows separately with two events the archive
-                holds in two transcripts.
+                both kinds of text, each speaker is one paired difference, and the mean gap is{" "}
+                {minus(readability.gap.gapT.estimate)} grade levels (95% t interval{" "}
+                {minus(readability.gap.gapT.lower)} to {minus(readability.gap.gapT.upper)}; at n ={" "}
+                {readability.gap.speakers.length} a percentile bootstrap gives the slightly narrower{" "}
+                {minus(readability.gap.gap.lower)} to {minus(readability.gap.gap.upper)}), of which{" "}
+                {minus(readability.gap.sentencePartT.estimate)} comes from sentence length.{" "}
+                {readability.gap.sign.negative} of {readability.gap.speakers.length} speakers grade
+                lower when transcribed (exact sign test p = {readability.gap.sign.p.toFixed(4)}).
+                These intervals cover sampling, not measurement: they do not include the effect of
+                who transcribed a debate, which the page shows separately with two events the
+                archive holds in two transcripts. The choice of clustered intervals is recorded in{" "}
+                <Link
+                  href="/methods/decisions/dr-006-clustered-intervals-for-readability"
+                  className="inline-link"
+                >
+                  DR-006
+                </Link>
+                .
               </p>
             </div>
             <Formula label="Splitting a difference in mean grade">
@@ -697,11 +733,15 @@ rate  = k / N × 10,000      interval scaled the same way`}
               <li>
                 <strong>Intervals.</strong> Every interval covers sampling variability given the
                 pipeline&apos;s choices (tokeniser, stop words, cleaning, roles). None of them
-                covers uncertainty in those choices.
+                covers uncertainty in those choices. Readability intervals resample speakers or
+                election cycles, but with 9 to 24 clusters they are approximate; the topic-label
+                intervals treat the {EVAL_ITEMS.length} excerpts, one per document, as independent.
               </li>
               <li>
                 <strong>Topic labels.</strong> A small, single-annotator draft gold set; most topics
-                have one to eight excerpts; one sentence out of context is hard for any coder.
+                have one to eight excerpts; one sentence out of context is hard for any coder. The
+                same AI assistant drafted the gold labels and wrote the keyword dictionary, so the
+                gold set is independent of neither labeller.
               </li>
               <li>
                 <strong>Many tests.</strong> Distinctive words tests every indexed word at once;
@@ -723,15 +763,20 @@ rate  = k / N × 10,000      interval scaled the same way`}
               </p>
               <p>
                 <strong>What it never does.</strong> It produces no number anywhere else on the
-                site; every other page is computed without AI. It is never told who said an excerpt,
-                it is never used to compare candidates or parties, and its labels are never
-                presented as facts: every output carries an &ldquo;AI-generated&rdquo; label, and
-                the simulated demo is labelled as simulated.
+                site; every other page is computed without AI. It is never used to compare
+                candidates or parties, and its labels are never presented as facts: every output
+                carries an &ldquo;AI-generated&rdquo; label, and the simulated demo is labelled as
+                simulated. A request that fails (a rejected key, a network or rate-limit error, or
+                pressing Stop) is left out of the scores, never counted as the model&apos;s wrong
+                answer.
               </p>
               <p>
                 <strong>Data sent to the provider.</strong> The codebook, the coding rules and the
                 excerpts (one sentence of 25 words or fewer each, with an opaque id), from your
-                browser straight to Anthropic or OpenAI. Your key is kept in your browser
+                browser straight to Anthropic or OpenAI. The speaker, date, title and link are not
+                sent as metadata, but {namedCount} of the {EVAL_ITEMS.length} excerpts name the
+                candidate in the text, and some name journalists or officials, so the model can
+                often tell whose campaign wrote them. Your key is kept in your browser
                 (sessionStorage, or localStorage if you tick &ldquo;remember on this device&rdquo;),
                 never sent to this site&apos;s server and never logged. The provider&apos;s own
                 terms apply to what you send it.
@@ -755,12 +800,20 @@ rate  = k / N × 10,000      interval scaled the same way`}
               </p>
               <p>
                 <strong>AI in building the site.</strong> The 2026 upgrade was built with an AI
-                coding assistant, which also prepared the draft gold labels (see{" "}
+                coding assistant, which also wrote the keyword dictionary and prepared the draft
+                gold labels (see{" "}
                 <Link
                   href="/methods/decisions/dr-004-llm-topic-labels-vs-keyword-rules"
                   className="inline-link"
                 >
                   DR-004
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/methods/decisions/dr-005-score-only-answered-excerpts"
+                  className="inline-link"
+                >
+                  DR-005
                 </Link>
                 ). Every statistic is computed by code that is tested against independent Python
                 implementations.

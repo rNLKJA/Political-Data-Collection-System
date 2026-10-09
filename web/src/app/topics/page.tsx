@@ -8,15 +8,14 @@ import { TopicHarness, type HarnessItem } from "@/components/topics/topic-harnes
 import { buildSystemPrompt, buildUserMessage, DEFAULT_BATCH_SIZE } from "@/lib/ai/topic-labels";
 import { formatDate, formatInt, formatPercent } from "@/lib/format";
 import { CODEBOOK, CODING_RULES, topicLabel } from "@/lib/topics/codebook";
-import { EVAL_ITEMS, GOLD_META, SAMPLE_META } from "@/lib/topics/data";
+import { EVAL_ITEMS, EXCERPTS_NAMING_CANDIDATE, GOLD_META, SAMPLE_META } from "@/lib/topics/data";
 import { scoreLabeller } from "@/lib/topics/evaluation";
 import { KEYWORD_RULES_VERSION, KEYWORDS, keywordLabel } from "@/lib/topics/keyword-rules";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Topic labels: an LLM against keyword rules",
-  description:
-    "A small, honest evaluation: policy-topic labels from a large language model (bring your own key) against a transparent keyword dictionary, on 120 hand-labelled campaign excerpts, with Cohen's kappa and bootstrap intervals.",
+  description: `Policy-topic labels from a large language model (bring your own key) against a transparent keyword dictionary, on ${EVAL_ITEMS.length} gold-labelled campaign excerpts${GOLD_META.status === "draft" ? " (a draft, single-annotator gold set prepared by an AI assistant and awaiting human review)" : ""}, with Cohen's kappa and bootstrap intervals.`,
 };
 
 export default function TopicsPage() {
@@ -59,7 +58,9 @@ export default function TopicsPage() {
           <Callout title="The gold labels are a first draft">
             {GOLD_META.annotator} Until they are reviewed, treat every score on this page as
             provisional. Because the draft came from the same model family as the default labeller,
-            agreement with Claude models may be flattered.
+            agreement with Claude models may be flattered. The same assistant also wrote the keyword
+            dictionary, so the gold labels are not independent of the baseline either, which could
+            move its scores in either direction.
           </Callout>
         ) : null}
 
@@ -120,7 +121,7 @@ export default function TopicsPage() {
         kicker="Transparency"
         title="What is sent to the provider"
         className="mt-16"
-        description="Only short excerpts. Each request carries the codebook, the coding rules and up to ten one-sentence excerpts of 25 words or fewer, each with an opaque id. No speaker, date, title, link or gold label is sent, and your key goes only to the provider you chose."
+        description={`Only short excerpts. Each request carries the codebook, the coding rules and up to ten one-sentence excerpts of 25 words or fewer, each with an opaque id. No speaker, date, title, link or gold label is sent as metadata, and your key goes only to the provider you chose. The text itself can still identify the campaign: ${EXCERPTS_NAMING_CANDIDATE} of the ${EVAL_ITEMS.length} excerpts name the candidate, and some name journalists or officials.`}
       >
         <div className="grid gap-6 lg:grid-cols-2">
           <Panel>
@@ -275,7 +276,7 @@ export default function TopicsPage() {
             Show all {EVAL_ITEMS.length} excerpts with their gold and keyword labels
           </summary>
           <div
-            className="mt-3 max-h-[40rem] overflow-auto rounded-md border border-border"
+            className="relative mt-3 max-h-[40rem] overflow-auto rounded-md border border-border"
             role="region"
             aria-label="The gold set"
             tabIndex={0}

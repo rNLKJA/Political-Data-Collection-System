@@ -7,8 +7,16 @@
  * codebook label per excerpt in a fixed JSON shape, validated with zod.
  *
  * Every call, including failures and the simulated no-key demo, is written to
- * the audit log (without the key). An excerpt the model did not label counts
- * as "no answer", which never matches a gold label.
+ * the audit log (without the key).
+ *
+ * What gets scored (DR-005): an excerpt is scorable when its batch got an
+ * answer from the model. If the model skipped it, refused, was cut off or
+ * returned unusable JSON, that is the model's doing, so it counts as "no
+ * answer", which never matches a gold label. If the request itself failed (a
+ * rejected key, billing, the network, rate limits after retries, a server or
+ * request error) or the visitor pressed Stop, the model never saw the
+ * excerpt: it is excluded, and the comparison is made on the scorable excerpts
+ * only, for both labellers.
  */
 import { z } from "zod";
 
@@ -16,7 +24,7 @@ import { CODEBOOK, CODING_RULES, TOPIC_IDS, type TopicId } from "@/lib/topics/co
 import { MOCK_MODEL_ID, mockLabel } from "@/lib/topics/mock-labeller";
 
 import type { JsonSchema } from "./adapters";
-import { newAuditEntry, type AuditStore } from "./audit-log";
+import { newAuditEntry, type AuditStore, type DecisionPatch } from "./audit-log";
 import { completeJson } from "./client";
 import { AiError, errorFromThrown } from "./errors";
 import type { ProviderId } from "./providers";
@@ -137,9 +145,15 @@ export interface RunConfig {
 
 export interface RunResult {
   labels: Record<string, AiLabel>;
-  /** audit entry id for each excerpt's batch */
+  /** excerpts the model answered for (including "no answer" from refusals or unusable output), in run order */
+  scoredIds: string[];
+  /** excerpts left out: their request failed, or the run stopped before reaching them */
+  excludedIds: string[];
+  /** audit entry id for each excerpt's batch (excerpts never sent have none) */
   entryOf: Record<string, string>;
   entryIds: string[];
+  /** entries with a usable answer, the only ones a person can accept, correct or reject */
+  reviewableEntryIds: string[];
   /** the model id the provider reported serving (last batch that answered) */
   servedModel: string | null;
   usage: { inputTokens: number; outputTokens: number };
@@ -155,15 +169,21 @@ export async function runTopicLabelling(
   const groups = batches(items, cfg.batchSize ?? DEFAULT_BATCH_SIZE);
   const result: RunResult = {
     labels: Object.fromEntries(items.map((i) => [i.id, NO_ANSWER])),
+    scoredIds: [],
+    excludedIds: [],
     entryOf: {},
     entryIds: [],
+    reviewableEntryIds: [],
     servedModel: null,
     usage: { inputTokens: 0, outputTokens: 0 },
     failures: [],
     stopped: null,
   };
   let done = 0;
+  const scored = new Set<string>();
   for (const [b, batch] of groups.entries()) {
+    let answered = false;
+    let reviewable = false;
     const user = buildUserMessage(batch);
     const ids = batch.map((x) => x.id);
     const meta = {
@@ -183,6 +203,8 @@ export async function runTopicLabelling(
         })),
       };
       Object.assign(result.labels, labelsForBatch(batch, answer));
+      answered = true;
+      reviewable = true;
       entry = newAuditEntry(
         {
           feature: "topic-labels",
@@ -217,6 +239,8 @@ export async function runTopicLabelling(
           onRetry: (f) => retries.push({ kind: f.kind, status: f.status }),
         });
         Object.assign(result.labels, labelsForBatch(batch, res.data));
+        answered = true;
+        reviewable = true;
         result.servedModel = res.model;
         result.usage.inputTokens += res.usage.inputTokens ?? 0;
         result.usage.outputTokens += res.usage.outputTokens ?? 0;
@@ -240,6 +264,8 @@ export async function runTopicLabelling(
       } catch (err) {
         const e = errorFromThrown(cfg.provider, err);
         result.failures.push({ batch: b + 1, kind: e.kind, message: e.message });
+        // a refusal, a cut-off or unusable output is the model's answer: scored as "no answer"
+        answered = e.modelFault;
         if (e.answered) {
           result.usage.inputTokens += e.answered.usage.inputTokens ?? 0;
           result.usage.outputTokens += e.answered.usage.outputTokens ?? 0;
@@ -278,14 +304,50 @@ export async function runTopicLabelling(
       // and the page says the log is unavailable.
     }
     result.entryIds.push(entry.id);
-    for (const id of ids) result.entryOf[id] = entry.id;
+    if (reviewable) result.reviewableEntryIds.push(entry.id);
+    for (const id of ids) {
+      result.entryOf[id] = entry.id;
+      if (answered) scored.add(id);
+    }
     done += batch.length;
     cfg.onProgress?.(done, items.length, {
       ...result.labels,
     });
     if (result.stopped) break;
   }
+  for (const it of items) (scored.has(it.id) ? result.scoredIds : result.excludedIds).push(it.id);
   return result;
+}
+
+export type RunDecision = "accepted" | "edited" | "rejected";
+
+/**
+ * The audit-log updates for a person's decision on a run. Only calls that
+ * returned a usable answer can be accepted, corrected or rejected; failed
+ * calls stay "pending" (nothing came back to review). "edited" records the
+ * corrections on each call that has one and marks the rest accepted.
+ */
+export function decisionPatches(
+  result: Pick<RunResult, "reviewableEntryIds" | "entryOf" | "labels">,
+  itemIds: readonly string[],
+  edits: Readonly<Record<string, TopicId>>,
+  next: RunDecision,
+): Array<{ entryId: string; patch: DecisionPatch }> {
+  return result.reviewableEntryIds.map((entryId) => {
+    const ids = itemIds.filter((i) => result.entryOf[i] === entryId);
+    if (next === "edited" && ids.some((i) => edits[i] !== undefined)) {
+      return {
+        entryId,
+        patch: {
+          decision: "edited",
+          edited_output: {
+            labels: ids.map((i) => ({ id: i, topic: edits[i] ?? result.labels[i] })),
+          },
+        },
+      };
+    }
+    return { entryId, patch: { decision: next === "edited" ? "accepted" : next } };
+  });
 }
 
 /** Rough input and output tokens for a run, for the cost estimate shown before it starts. */

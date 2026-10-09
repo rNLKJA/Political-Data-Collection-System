@@ -14,9 +14,12 @@ readability summaries), computed with the Python scientific stack.
 * Wilson intervals and McNemar's exact test: statsmodels
 * Cohen's kappa and per-class precision / recall / F1: scikit-learn
 * OLS slope: scipy.stats.linregress
+* Student's t quantiles and t intervals: scipy.stats.t; the sign test:
+  scipy.stats.binomtest
 * percentile bootstrap: numpy.quantile on resamples drawn from a vectorised
   port of the same mulberry32 generator, so the TypeScript intervals can be
-  compared digit for digit
+  compared digit for digit; the cluster bootstrap draws whole clusters (in
+  ascending key order) from the same stream
 * Fightin' Words bootstrap stability: an independent Python port of the
   procedure on a small synthetic corpus
 * the /readability summaries, recomputed from web/data/analytics.db
@@ -105,6 +108,40 @@ def boot_mean(x: np.ndarray, resamples: int = RESAMPLES, seed: int = SEED) -> di
     return interval(x[idx].mean(axis=1), x.mean())
 
 
+def cluster_members(keys) -> list[np.ndarray]:
+    """Row indices per cluster, clusters in ascending key order."""
+    keys = list(keys)
+    return [np.array([i for i, k in enumerate(keys) if k == c]) for c in sorted(set(keys))]
+
+
+def boot_cluster_mean(x: np.ndarray, keys, resamples: int = RESAMPLES, seed: int = SEED) -> dict:
+    """Mean over all rows of the drawn clusters, whole clusters resampled."""
+    members = cluster_members(keys)
+    sums = np.array([x[m].sum() for m in members])
+    counts = np.array([len(m) for m in members])
+    idx = resample_indices(len(members), resamples, seed)
+    vals = sums[idx].sum(axis=1) / counts[idx].sum(axis=1)
+    return {**interval(vals, x.mean()), "clusters": len(members)}
+
+
+def t_interval(x: np.ndarray) -> dict:
+    lo, hi = stats.t.interval(LEVEL, len(x) - 1, loc=x.mean(), scale=stats.sem(x))
+    return {"estimate": float(x.mean()), "lower": float(lo), "upper": float(hi)}
+
+
+def sign_test(x: np.ndarray) -> dict:
+    neg, pos = int((x < 0).sum()), int((x > 0).sum())
+    p = stats.binomtest(min(neg, pos), neg + pos, 0.5).pvalue if neg + pos else 1.0
+    return {"negative": neg, "positive": pos, "p": float(p)}
+
+
+def ols_slope(xs: np.ndarray, ys: np.ndarray) -> tuple[float, float]:
+    mx, my = xs.mean(), ys.mean()
+    sxx = ((xs - mx) ** 2).sum()
+    slope = ((xs - mx) * (ys - my)).sum() / sxx if sxx > 0 else math.nan
+    return slope, my - slope * mx
+
+
 # ----------------------------------------------------------------- unit fixtures
 def kappa(a, b) -> float:
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -174,6 +211,39 @@ def units() -> dict:
 
     x = np.random.default_rng(3).gamma(2.0, 1.5, size=40).round(6)
     out["bootstrap_mean"] = {"x": x.tolist(), "resamples": 2000, "seed": 99, **boot_mean(x, 2000, 99)}
+
+    out["t_ppf"] = [
+        [p, df, float(stats.t.ppf(p, df))]
+        for p, df in [(0.975, 1), (0.975, 2), (0.975, 13), (0.995, 13), (0.9, 5), (0.025, 30), (0.975, 200)]
+    ]
+    tx = np.random.default_rng(14).normal(-5, 2.5, size=14).round(6)
+    out["t_interval"] = {"x": tx.tolist(), **t_interval(tx)}
+    sx = np.array([-1.2, -0.4, 0.0, -2.2, 0.3, -0.9, -1.1, -0.1, -3.0])
+    out["sign_test"] = [
+        {"x": sx.tolist(), **sign_test(sx)},
+        {"x": [-1.0] * 14, **sign_test(np.array([-1.0] * 14))},
+    ]
+
+    # cluster bootstrap: 12 clusters of uneven size, mean and OLS slope
+    rs = np.random.default_rng(21)
+    keys = np.repeat(np.arange(12) * 4 + 1960, rs.integers(1, 9, size=12))
+    cx = (keys + rs.uniform(0, 1, size=len(keys))).round(4)
+    cy = (12 - 0.04 * (cx - 1960) + rs.normal(0, 1, size=len(keys)) + np.repeat(rs.normal(0, 1, size=12), np.bincount(np.searchsorted(np.unique(keys), keys)))).round(4)
+    members = cluster_members(keys.tolist())
+    idx = resample_indices(len(members), 2000, 5)
+    slopes = []
+    for row in idx:
+        sel = np.concatenate([members[c] for c in row])
+        slopes.append(ols_slope(cx[sel], cy[sel])[0])
+    out["cluster_bootstrap"] = {
+        "keys": keys.tolist(),
+        "x": cx.tolist(),
+        "y": cy.tolist(),
+        "resamples": 2000,
+        "seed": 5,
+        "mean": boot_cluster_mean(cy, keys.tolist(), 2000, 5),
+        "slope": {**interval(np.array(slopes), ols_slope(cx, cy)[0]), "clusters": len(members)},
+    }
 
     xr = np.random.default_rng(8).uniform(1960, 2024, size=30).round(3)
     yr = (10 - 0.05 * (xr - 1960) + np.random.default_rng(9).normal(0, 0.8, size=30)).round(4)
@@ -307,10 +377,21 @@ def readability() -> dict:
     cells = []
     for reg in ("written", "transcribed", "address"):
         for cyc in (2016, 2020, 2024):
-            g = np.array([r[7] for r in docs if r[2] == cyc and REGISTER[r[3]] == reg])
-            cell = {"cycle": cyc, "register": reg, "n": int(len(g)), "mean": float(g.mean())}
-            if len(g) >= 5:
-                cell["interval"] = boot_mean(g)
+            rows = [r for r in docs if r[2] == cyc and REGISTER[r[3]] == reg]
+            g = np.array([r[7] for r in rows])
+            keys = [r[1] for r in rows]
+            cell = {
+                "cycle": cyc,
+                "register": reg,
+                "n": int(len(g)),
+                "speakers": len(set(keys)),
+                "mean": float(g.mean()),
+            }
+            if len(g) >= 5 and len(set(keys)) >= 5:
+                # speakers resampled: a speaker's documents move together
+                cell["interval"] = boot_cluster_mean(g, keys)
+                # documents resampled as if independent, for comparison only
+                cell["documentInterval"] = boot_mean(g)
             cells.append(cell)
 
     by: dict[int, dict[str, list]] = {}
@@ -338,6 +419,11 @@ def readability() -> dict:
         "gap": boot_mean(gaps),
         "sentencePart": boot_mean(sent),
         "wordPart": boot_mean(word),
+        "gapT": t_interval(gaps),
+        "sentencePartT": t_interval(sent),
+        "wordPartT": t_interval(word),
+        "sign": sign_test(gaps),
+        "wilcoxon_p": float(stats.wilcoxon(gaps).pvalue),
         "dz": float(gaps.mean() / gaps.std(ddof=1)),
     }
 
@@ -357,16 +443,15 @@ def readability() -> dict:
     def trend(rows) -> dict:
         x = np.array([frac(r[0]) for r in rows])
         y = np.array([r[3] for r in rows])
-        idx = resample_indices(len(x))
-        slopes, fits = [], []
-        for row in idx:
-            xs, ys = x[row], y[row]
-            mx, my = xs.mean(), ys.mean()
-            sxx = ((xs - mx) ** 2).sum()
-            slope = ((xs - mx) * (ys - my)).sum() / sxx if sxx > 0 else math.nan
-            slopes.append(slope * 10)
-            fits.append([my - slope * mx + slope * yr for yr in years])
         lr = stats.linregress(x, y)
+        # cycles resampled (a cycle's debates move together)
+        members = cluster_members([r[1] for r in rows])
+        slopes, fits = [], []
+        for row in resample_indices(len(members)):
+            sel = np.concatenate([members[c] for c in row])
+            slope, intercept = ols_slope(x[sel], y[sel])
+            slopes.append(slope * 10)
+            fits.append([intercept + slope * yr for yr in years])
         fits = np.array(fits)
         band = []
         for j, yr in enumerate(years):
@@ -374,7 +459,15 @@ def readability() -> dict:
             col = col[~np.isnan(col)]
             lo, hi = np.quantile(col, [ALPHA / 2, 1 - ALPHA / 2])
             band.append({"year": yr, "lower": float(lo), "upper": float(hi)})
-        return {"n": len(x), "perDecade": interval(np.array(slopes), lr.slope * 10), "band": band}
+        # debates resampled as if independent, for comparison only
+        deb_slopes = [ols_slope(x[row], y[row])[0] * 10 for row in resample_indices(len(x))]
+        return {
+            "n": len(x),
+            "cycles": len(members),
+            "perDecade": interval(np.array(slopes), lr.slope * 10),
+            "perDecadeDebates": interval(np.array(deb_slopes), lr.slope * 10),
+            "band": band,
+        }
 
     def by_cycle(rows) -> list:
         out = []
@@ -409,7 +502,15 @@ def main() -> None:
     print(f"wrote {OUT.relative_to(ROOT)}")
     r = out["readability"]
     print("within-speaker gap:", json.dumps(r["gap"]["gap"]), "n =", len(r["gap"]["speakers"]))
-    print("general per decade:", json.dumps(r["general"]["trend"]["perDecade"]))
+    print("within-speaker gap (t):", json.dumps(r["gap"]["gapT"]), "sign:", json.dumps(r["gap"]["sign"]))
+    for kind in ("general", "primary"):
+        t = r[kind]["trend"]
+        print(f"{kind} per decade (cycles):", json.dumps(t["perDecade"]), "cycles =", t["cycles"])
+        print(f"{kind} per decade (debates):", json.dumps(t["perDecadeDebates"]))
+    for c in r["cells"]:
+        if "interval" in c:
+            i, d = c["interval"], c["documentInterval"]
+            print(c["cycle"], c["register"], c["n"], c["speakers"], f"{i['lower']:.2f}-{i['upper']:.2f}", f"(docs {d['lower']:.2f}-{d['upper']:.2f})")
 
 
 if __name__ == "__main__":

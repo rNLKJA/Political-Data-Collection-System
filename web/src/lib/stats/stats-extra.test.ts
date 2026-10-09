@@ -8,13 +8,21 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { at, cohensKappa, perClassMetrics } from "./agreement";
-import { bootstrap, bootstrapMean, quantile } from "./bootstrap";
-import { binomialCdf, normalQuantile } from "./distributions";
+import {
+  bootstrap,
+  bootstrapMean,
+  clusterBootstrap,
+  clusterBootstrapMean,
+  groupRows,
+  quantile,
+} from "./bootstrap";
+import { binomialCdf, normalQuantile, studentTCdf, studentTQuantile } from "./distributions";
 import { fightinWordsStability, kthLargest } from "./fw-stability";
 import { mcnemar } from "./mcnemar";
 import { wilsonInterval } from "./proportion";
 import { mulberry32, sampleWithoutReplacement } from "./random";
 import { olsLine } from "./regression";
+import { signTest, tIntervalMean } from "./small-sample";
 
 const ref = JSON.parse(
   fs.readFileSync(path.resolve(process.cwd(), "src/lib/__fixtures__/stats-reference.json"), "utf8"),
@@ -45,6 +53,14 @@ describe("mulberry32 and sampling", () => {
 describe("distributions", () => {
   it("normal quantile matches scipy", () => {
     for (const [p, q] of U.normal_ppf) close(normalQuantile(p), q, 1e-12);
+  });
+  it("Student's t quantile matches scipy, and the CDF inverts it", () => {
+    for (const [p, df, q] of U.t_ppf) {
+      close(studentTQuantile(p, df), q, 1e-10);
+      close(studentTCdf(q, df), p, 1e-12);
+    }
+    expect(studentTQuantile(0.5, 7)).toBe(0);
+    expect(Number.isNaN(studentTQuantile(0.9, 0))).toBe(true);
   });
   it("binomial CDF matches scipy", () => {
     for (const [k, n, p, c] of U.binom_cdf) close(binomialCdf(k, n, p), c, 1e-12);
@@ -129,6 +145,65 @@ describe("intervals and tests", () => {
     close(fit.slope, U.ols.slope, 1e-10);
     close(fit.intercept, U.ols.intercept, 1e-8);
     expect(Number.isNaN(olsLine([1, 1], [2, 3]).slope)).toBe(true);
+  });
+
+  it("t interval for a mean matches scipy.stats.t.interval", () => {
+    const ci = tIntervalMean(U.t_interval.x);
+    close(ci.estimate, U.t_interval.estimate, 1e-12);
+    close(ci.lower, U.t_interval.lower, 1e-10);
+    close(ci.upper, U.t_interval.upper, 1e-10);
+    expect(ci.df).toBe(U.t_interval.x.length - 1);
+    expect(Number.isNaN(tIntervalMean([1]).lower)).toBe(true);
+  });
+
+  it("sign test matches scipy.stats.binomtest and ignores ties", () => {
+    for (const c of U.sign_test) {
+      const s = signTest(c.x);
+      expect([s.negative, s.positive]).toEqual([c.negative, c.positive]);
+      close(s.p, c.p, 1e-12);
+    }
+    expect(signTest([0, 0]).p).toBe(1);
+  });
+});
+
+describe("cluster bootstrap", () => {
+  const C = U.cluster_bootstrap;
+  const opts = { resamples: C.resamples, seed: C.seed };
+
+  it("groups rows by key in ascending order", () => {
+    expect(groupRows([5, 3, 5, 1])).toEqual({ keys: [1, 3, 5], members: [[3], [1], [0, 2]] });
+  });
+
+  it("resamples whole clusters exactly like the numpy reference", () => {
+    const m = clusterBootstrapMean(C.y, C.keys, opts);
+    expect(m.method).toBe("cluster bootstrap");
+    expect(m.clusters).toBe(C.mean.clusters);
+    close(m.estimate, C.mean.estimate, 1e-12);
+    close(m.lower, C.mean.lower);
+    close(m.upper, C.mean.upper);
+    close(m.se, C.mean.se, 1e-8);
+
+    const s = clusterBootstrap(
+      C.keys,
+      (rows) =>
+        olsLine(
+          rows.map((r) => C.x[r]),
+          rows.map((r) => C.y[r]),
+        ).slope,
+      opts,
+    );
+    expect(s.clusters).toBe(C.slope.clusters);
+    close(s.estimate, C.slope.estimate, 1e-9);
+    close(s.lower, C.slope.lower, 1e-8);
+    close(s.upper, C.slope.upper, 1e-8);
+  });
+
+  it("is wider than a row bootstrap when clusters share a level", () => {
+    const keys = Array.from({ length: 60 }, (_, i) => Math.floor(i / 10));
+    const values = keys.map((k, i) => k * 3 + (i % 10) * 0.01);
+    const rowCi = bootstrapMean(values, opts);
+    const clusterCi = clusterBootstrapMean(values, keys, opts);
+    expect(clusterCi.upper - clusterCi.lower).toBeGreaterThan(2 * (rowCi.upper - rowCi.lower));
   });
 });
 

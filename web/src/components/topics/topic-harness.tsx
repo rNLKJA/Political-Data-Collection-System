@@ -14,6 +14,7 @@ import { describeAiError } from "@/lib/ai/errors";
 import { estimateCostUsd, PROVIDERS } from "@/lib/ai/providers";
 import { activeKey, activeModel } from "@/lib/ai/settings";
 import {
+  decisionPatches,
   DEFAULT_BATCH_SIZE,
   estimateRunTokens,
   NO_ANSWER,
@@ -23,7 +24,7 @@ import {
 } from "@/lib/ai/topic-labels";
 import { toCsv } from "@/lib/csv";
 import { downloadText, fileStamp } from "@/lib/download";
-import { formatInt } from "@/lib/format";
+import { formatDecimal, formatInt } from "@/lib/format";
 import { DEFAULT_SEED } from "@/lib/stats/bootstrap";
 import { sampleWithoutReplacement } from "@/lib/stats/random";
 import { CODEBOOK, isTopicId, topicLabel, type TopicId } from "@/lib/topics/codebook";
@@ -53,11 +54,17 @@ interface Run {
   n: number;
   seed: number;
   items: HarnessItem[];
+  /** the excerpts the model answered for: both labellers are scored on these only */
+  scored: HarnessItem[];
+  /** excerpts whose request failed or was never sent (stopped run) */
+  excluded: HarnessItem[];
   result: RunResult;
 }
 
 const SIZES = [20, 40, 60, 120] as const;
 const label = (l: AiLabel) => (l === NO_ANSWER ? "No answer" : topicLabel(l));
+const SCORING_RULE =
+  "Excerpts whose request failed or was stopped are left out of the scores for both labellers; an excerpt the model skipped, refused or answered unusably counts as \u201cno answer\u201d.";
 
 function uuid() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -97,6 +104,7 @@ export function TopicHarness({ items }: { items: HarnessItem[] }) {
     setLogNote(null);
     setEdits({});
     setDecision("pending");
+    setRun(null);
     const controller = new AbortController();
     abort.current = controller;
     const runId = uuid();
@@ -119,6 +127,20 @@ export function TopicHarness({ items }: { items: HarnessItem[] }) {
           onProgress: (done, total) => setProgress({ done, total }),
         },
       );
+      const firstFailure = result.failures[0];
+      const problemText = result.stopped
+        ? describeAiError(result.stopped)
+        : firstFailure
+          ? `${result.failures.length} request${result.failures.length === 1 ? "" : "s"} failed (${firstFailure.message}).`
+          : null;
+      if (result.scoredIds.length === 0) {
+        // Nothing came back from the model: there is nothing to score or label as AI output.
+        setError(
+          `${problemText ?? "The model did not answer."} No excerpt was labelled, so there is nothing to score. The failed call${result.entryIds.length === 1 ? " is" : "s are"} in the AI log.`,
+        );
+        return;
+      }
+      const scored = new Set(result.scoredIds);
       setRun({
         runId,
         simulated,
@@ -128,9 +150,11 @@ export function TopicHarness({ items }: { items: HarnessItem[] }) {
         n: picked.length,
         seed,
         items: picked,
+        scored: picked.filter((i) => scored.has(i.id)),
+        excluded: picked.filter((i) => !scored.has(i.id)),
         result,
       });
-      if (result.stopped) setError(describeAiError(result.stopped));
+      if (problemText) setError(`${problemText} ${SCORING_RULE}`);
     } catch (e) {
       setError(describeAiError(e));
     } finally {
@@ -142,24 +166,18 @@ export function TopicHarness({ items }: { items: HarnessItem[] }) {
   async function decide(next: Exclude<Decision, "pending">) {
     if (!run) return;
     const store = getAuditStore();
+    const patches = decisionPatches(
+      run.result,
+      run.items.map((i) => i.id),
+      edits,
+      next,
+    );
+    const failed = run.result.entryIds.length - patches.length;
     try {
-      for (const entryId of run.result.entryIds) {
-        const ids = run.items.filter((i) => run.result.entryOf[i.id] === entryId).map((i) => i.id);
-        const changed = ids.some((i) => edits[i] !== undefined);
-        if (next === "edited" && changed) {
-          await store.decide(entryId, {
-            decision: "edited",
-            edited_output: {
-              labels: ids.map((i) => ({ id: i, topic: edits[i] ?? run.result.labels[i] })),
-            },
-          });
-        } else {
-          await store.decide(entryId, { decision: next === "edited" ? "accepted" : next });
-        }
-      }
+      for (const { entryId, patch } of patches) await store.decide(entryId, patch);
       setDecision(next);
       setLogNote(
-        `Recorded in the AI audit log for ${run.result.entryIds.length} call${run.result.entryIds.length === 1 ? "" : "s"}.`,
+        `Recorded in the AI audit log for ${patches.length} call${patches.length === 1 ? "" : "s"}${failed ? `; ${failed} failed call${failed === 1 ? " has" : "s have"} nothing to review and stay${failed === 1 ? "s" : ""} pending` : ""}.`,
       );
     } catch {
       setLogNote("The audit log is not available in this browser, so the decision was not saved.");
@@ -273,10 +291,7 @@ export function TopicHarness({ items }: { items: HarnessItem[] }) {
             className="mt-4 flex gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
           >
             <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
-            <span>
-              {error} Excerpts without a label count as &ldquo;no answer&rdquo;, which never matches
-              the gold label.
-            </span>
+            <span>{error}</span>
           </p>
         ) : null}
       </div>
@@ -310,41 +325,51 @@ function RunResults({
   onDecide: (d: Exclude<Decision, "pending">) => void;
   logNote: string | null;
 }) {
-  const gold = run.items.map((i) => i.gold);
-  const ai = run.items.map((i) => run.result.labels[i.id] ?? NO_ANSWER);
-  const rules = run.items.map((i) => i.rules);
-  const stats = useMemo(
-    () => ({
-      ai: scoreLabeller(gold, ai as TopicId[]),
+  const stats = useMemo(() => {
+    // Both labellers are scored on the excerpts the model answered for, so the comparison stays paired.
+    const gold = run.scored.map((i) => i.gold);
+    const ai = run.scored.map((i) => run.result.labels[i.id] ?? NO_ANSWER) as TopicId[];
+    const rules = run.scored.map((i) => i.rules);
+    return {
+      ai: scoreLabeller(gold, ai),
       rules: scoreLabeller(gold, rules),
-      paired: comparePaired(gold, ai as TopicId[], rules),
-    }),
-    // gold/ai/rules derive from `run`, which is immutable once set
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [run],
-  );
+      paired: comparePaired(gold, ai, rules),
+    };
+  }, [run]);
   const name = run.simulated ? "Simulated labeller" : "LLM";
+  const nameInText = run.simulated ? "simulated labeller" : "LLM";
+  const m = run.scored.length;
+  const incomplete = run.excluded.length > 0;
+  const scoredIds = new Set(run.result.scoredIds);
+  const reviewable = new Set(run.result.reviewableEntryIds);
   const d = stats.paired.agreementDiff;
-  const verdict = Number.isNaN(d.lower)
-    ? "There is not enough data for an interval."
-    : d.lower > 0
-      ? `On these ${run.n} excerpts the ${name.toLowerCase()} matches the gold labels more often than the keyword rules, and the 95% interval for the difference excludes zero.`
-      : d.upper < 0
-        ? `On these ${run.n} excerpts the keyword rules match the gold labels more often than the ${name.toLowerCase()}, and the 95% interval for the difference excludes zero.`
-        : `The 95% interval for the difference includes zero, so these ${run.n} excerpts cannot tell the two apart.`;
+  const verdict = incomplete
+    ? `This run is incomplete, so no verdict is drawn. The figures use only the ${m} of ${run.n} excerpts the ${nameInText} answered for; run it again to score the whole sample.`
+    : Number.isNaN(d.lower)
+      ? "There is not enough data for an interval."
+      : d.lower > 0
+        ? `On these ${m} excerpts the ${nameInText} matches the gold labels more often than the keyword rules, and the 95% interval for the difference excludes zero.`
+        : d.upper < 0
+          ? `On these ${m} excerpts the keyword rules match the gold labels more often than the ${nameInText}, and the 95% interval for the difference excludes zero.`
+          : `The 95% interval for the difference includes zero, so these ${m} excerpts cannot tell the two apart.`;
   const editsCount = Object.keys(edits).length;
 
-  const rows = run.items.map((i, k) => ({
-    id: i.id,
-    excerpt: i.excerpt,
-    source: i.url,
-    gold: i.gold,
-    rules: i.rules,
-    model_label: ai[k],
-    human_correction: edits[i.id] ?? "",
-    model_matches_gold: ai[k] === i.gold,
-    rules_match_gold: i.rules === i.gold,
-  }));
+  const rows = run.items.map((i) => {
+    const scored = scoredIds.has(i.id);
+    const modelLabel = scored ? (run.result.labels[i.id] ?? NO_ANSWER) : "";
+    return {
+      id: i.id,
+      excerpt: i.excerpt,
+      source: i.url,
+      gold: i.gold,
+      rules: i.rules,
+      scored,
+      model_label: modelLabel,
+      human_correction: edits[i.id] ?? "",
+      model_matches_gold: scored ? modelLabel === i.gold : "",
+      rules_match_gold: i.rules === i.gold,
+    };
+  });
   const exportMeta = {
     run_id: run.runId,
     started_at: run.startedAt,
@@ -354,6 +379,14 @@ function RunResults({
     served_model: run.result.servedModel,
     sample_size: run.n,
     sample_seed: run.seed,
+    complete: !incomplete,
+    excerpts_scored: m,
+    excluded_ids: run.excluded.map((i) => i.id),
+    scoring_rule: SCORING_RULE,
+    failures: run.result.failures,
+    stopped: run.result.stopped
+      ? { kind: run.result.stopped.kind, message: run.result.stopped.message }
+      : null,
     bootstrap: { resamples: stats.paired.kappaDiff.resamples, seed: stats.paired.kappaDiff.seed },
     human_decision: decision,
     metrics: {
@@ -381,7 +414,9 @@ function RunResults({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4 sm:px-5">
         <div className="min-w-0">
           <h3 id="run-results" className="font-serif text-xl">
-            Results on {run.n} excerpts
+            {incomplete
+              ? `Partial run: results on ${m} of ${run.n} excerpts`
+              : `Results on ${m} excerpts`}
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Seed {run.seed} · run {run.runId.slice(0, 8)} ·{" "}
@@ -404,14 +439,25 @@ function RunResults({
         </p>
       ) : null}
 
+      {incomplete ? (
+        <p className="flex gap-2 border-b border-border bg-destructive/5 px-4 py-2.5 text-sm sm:px-5">
+          <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+          <span>
+            Incomplete run: {run.excluded.length} of {run.n} excerpts were left out because their
+            request failed or the run was stopped. The model never saw them, so they are not counted
+            against it. Both labellers are scored on the same {m} excerpts.
+          </span>
+        </p>
+      ) : null}
+
       <div className="grid gap-6 p-4 sm:p-5 lg:grid-cols-[1.15fr_1fr]">
         <div
-          className="overflow-x-auto"
+          className="relative overflow-x-auto"
           role="region"
           aria-label="Scores against the gold labels (scrolls sideways on small screens)"
           tabIndex={0}
         >
-          <table className="w-full min-w-[30rem] text-sm">
+          <table className="w-full text-sm sm:min-w-[30rem]">
             <caption className="mb-2 text-left text-xs text-muted-foreground">
               Against the gold labels, with 95% intervals (Wilson for shares, percentile bootstrap
               over excerpts for kappa, {formatInt(stats.ai.kappa.resamples)} resamples, seed{" "}
@@ -471,19 +517,19 @@ function RunResults({
           <p className="kicker">Paired on the same excerpts</p>
           <dl className="mt-2 space-y-2.5 text-sm">
             <div>
-              <dt className="text-muted-foreground">Agreement, {name.toLowerCase()} minus rules</dt>
+              <dt className="text-muted-foreground">Agreement, {nameInText} minus rules</dt>
               <dd className="tabular font-medium">{pointsInterval(stats.paired.agreementDiff)}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Kappa, {name.toLowerCase()} minus rules</dt>
+              <dt className="text-muted-foreground">Kappa, {nameInText} minus rules</dt>
               <dd className="tabular font-medium">{signedInterval(stats.paired.kappaDiff)}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">McNemar&apos;s exact test</dt>
               <dd className="tabular">
-                p = {formatP(stats.paired.mcnemar.exactP)}{" "}
+                {formatP(stats.paired.mcnemar.exactP)}{" "}
                 <span className="text-muted-foreground">
-                  ({stats.paired.mcnemar.b} only the {name.toLowerCase()} got right,{" "}
+                  ({stats.paired.mcnemar.b} only the {nameInText} got right,{" "}
                   {stats.paired.mcnemar.c} only the rules)
                 </span>
               </dd>
@@ -492,44 +538,56 @@ function RunResults({
               <dt className="text-muted-foreground">The two give the same label</dt>
               <dd className="tabular">
                 {Math.round(stats.paired.between.agreement * 100)}% of excerpts (kappa{" "}
-                {Number.isNaN(stats.paired.between.kappa)
-                  ? "–"
-                  : stats.paired.between.kappa.toFixed(2)}
-                )
+                {formatDecimal(stats.paired.between.kappa, 2)})
               </dd>
             </div>
           </dl>
-          <p className="mt-3 rounded-md bg-secondary/50 p-3 text-sm">{verdict}</p>
+          <p
+            className={cn(
+              "mt-3 rounded-md p-3 text-sm",
+              incomplete ? "border border-destructive/40 bg-destructive/5" : "bg-secondary/50",
+            )}
+          >
+            {verdict}
+          </p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border p-4 sm:px-5">
-        <span className="mr-1 text-sm font-medium">Your decision on these labels</span>
-        <Button
-          size="sm"
-          onClick={() => onDecide("accepted")}
-          aria-pressed={decision === "accepted"}
-        >
-          <Check aria-hidden /> Accept
-        </Button>
-        <Button
-          size="sm"
-          disabled={editsCount === 0}
-          onClick={() => onDecide("edited")}
-          aria-pressed={decision === "edited"}
-        >
-          Record {editsCount || ""} correction{editsCount === 1 ? "" : "s"}
-        </Button>
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={() => onDecide("rejected")}
-          aria-pressed={decision === "rejected"}
-        >
-          <X aria-hidden /> Reject
-        </Button>
+        {reviewable.size > 0 ? (
+          <>
+            <span className="mr-1 text-sm font-medium">Your decision on these labels</span>
+            <Button
+              size="sm"
+              onClick={() => onDecide("accepted")}
+              aria-pressed={decision === "accepted"}
+            >
+              <Check aria-hidden /> Accept
+            </Button>
+            <Button
+              size="sm"
+              disabled={editsCount === 0}
+              onClick={() => onDecide("edited")}
+              aria-pressed={decision === "edited"}
+            >
+              Record {editsCount || ""} correction{editsCount === 1 ? "" : "s"}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => onDecide("rejected")}
+              aria-pressed={decision === "rejected"}
+            >
+              <X aria-hidden /> Reject
+            </Button>
+          </>
+        ) : (
+          <span className="mr-1 text-sm">
+            No call returned a usable answer, so there is nothing to accept, correct or reject.
+          </span>
+        )}
         <span className="text-xs text-muted-foreground" role="status">
-          {logNote ?? `Decision: ${decision}.`}{" "}
+          {logNote ?? (reviewable.size > 0 ? `Decision: ${decision}.` : "")}{" "}
           <Link href="/ai-log" className="inline-link">
             Open the AI log
           </Link>
@@ -546,6 +604,7 @@ function RunResults({
                   "source",
                   "gold",
                   "rules",
+                  "scored",
                   "model_label",
                   "human_correction",
                   "model_matches_gold",
@@ -572,20 +631,19 @@ function RunResults({
         </span>
       </div>
       <p className="px-4 pb-3 text-xs text-muted-foreground sm:px-5">
-        Scores always use the {name.toLowerCase()}&apos;s own labels. A correction you make below is
+        Scores always use the {nameInText}&apos;s own labels. A correction you make below is
         recorded in the audit log as an edit; it never changes the evaluation.
       </p>
 
       <div
-        className="max-h-[36rem] overflow-auto border-t border-border"
+        className="relative max-h-[36rem] overflow-auto border-t border-border"
         role="region"
         aria-label="Labels for each excerpt"
         tabIndex={0}
       >
         <table className="w-full min-w-[46rem] text-left text-sm">
           <caption className="sr-only">
-            Each excerpt with its gold label, the keyword rules&apos; label and the{" "}
-            {name.toLowerCase()}&apos;s label
+            {`Each excerpt with its gold label, the keyword rules' label and the ${nameInText}'s label`}
           </caption>
           <thead className="sticky top-0 z-10 bg-secondary text-xs">
             <tr>
@@ -604,47 +662,63 @@ function RunResults({
             </tr>
           </thead>
           <tbody>
-            {run.items.map((it, k) => (
-              <tr key={it.id} className="border-t border-border/70 align-top">
-                <td className="max-w-[26rem] px-3 py-2">
-                  <span className="font-mono text-[0.7rem] text-muted-foreground">{it.id}</span>{" "}
-                  <span className="font-serif">{it.excerpt}</span>{" "}
-                  <SourceLink href={it.url} className="text-xs">
-                    Source
-                  </SourceLink>
-                </td>
-                <td className="px-3 py-2 text-xs whitespace-nowrap">{topicLabel(it.gold)}</td>
-                <td className="px-3 py-2 text-xs">
-                  <Verdict ok={it.rules === it.gold} text={topicLabel(it.rules)} />
-                </td>
-                <td className="px-3 py-2 text-xs">
-                  <Verdict ok={ai[k] === it.gold} text={label(ai[k])} />
-                  <label className="mt-1 block">
-                    <span className="sr-only">Correct the label for {it.id}</span>
-                    <select
-                      value={edits[it.id] ?? ""}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setEdits((cur) => {
-                          const next = { ...cur };
-                          if (isTopicId(v)) next[it.id] = v;
-                          else delete next[it.id];
-                          return next;
-                        });
-                      }}
-                      className="mt-0.5 h-7 max-w-[11rem] rounded border border-input bg-card px-1 text-xs"
-                    >
-                      <option value="">Keep</option>
-                      {CODEBOOK.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </td>
-              </tr>
-            ))}
+            {run.items.map((it) => {
+              const scored = scoredIds.has(it.id);
+              const ai = run.result.labels[it.id] ?? NO_ANSWER;
+              const editable = scored && reviewable.has(run.result.entryOf[it.id] ?? "");
+              return (
+                <tr
+                  key={it.id}
+                  className={cn("border-t border-border/70 align-top", !scored && "opacity-70")}
+                >
+                  <td className="max-w-[26rem] px-3 py-2">
+                    <span className="font-mono text-[0.7rem] text-muted-foreground">{it.id}</span>{" "}
+                    <span className="font-serif">{it.excerpt}</span>{" "}
+                    <SourceLink href={it.url} className="text-xs">
+                      Source
+                    </SourceLink>
+                  </td>
+                  <td className="px-3 py-2 text-xs whitespace-nowrap">{topicLabel(it.gold)}</td>
+                  <td className="px-3 py-2 text-xs">
+                    <Verdict ok={it.rules === it.gold} text={topicLabel(it.rules)} />
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    {scored ? (
+                      <Verdict ok={ai === it.gold} text={label(ai)} />
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Left out: the request failed or was not sent
+                      </span>
+                    )}
+                    {editable ? (
+                      <label className="mt-1 block">
+                        <span className="sr-only">Correct the label for {it.id}</span>
+                        <select
+                          value={edits[it.id] ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setEdits((cur) => {
+                              const next = { ...cur };
+                              if (isTopicId(v)) next[it.id] = v;
+                              else delete next[it.id];
+                              return next;
+                            });
+                          }}
+                          className="mt-0.5 h-7 max-w-[11rem] rounded border border-input bg-card px-1 text-xs"
+                        >
+                          <option value="">Keep</option>
+                          {CODEBOOK.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

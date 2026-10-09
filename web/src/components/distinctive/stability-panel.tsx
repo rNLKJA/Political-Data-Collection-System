@@ -4,12 +4,26 @@ import { formatDecimal, formatInt, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { StabilityView, StableWord } from "@/server/term-index";
 
-/** A word "rests on few documents" if it often drops out or one document supplies a quarter of it. */
+/** A word is flagged if it often drops out of the list, or one document supplies a quarter of its uses. */
 export const FRAGILE_STABILITY = 0.5;
 export const HEAVY_DOC_SHARE = 0.25;
 
-function fragile(w: StableWord) {
-  return w.stability < FRAGILE_STABILITY || w.topDocShare >= HEAVY_DOC_SHARE;
+/** Why a word is flagged (both reasons can apply). */
+function flags(w: StableWord): Array<{ tag: string; title: string }> {
+  const out: Array<{ tag: string; title: string }> = [];
+  if (w.topDocShare >= HEAVY_DOC_SHARE) {
+    out.push({
+      tag: "one doc ≥25%",
+      title: `${formatPercent(w.topDocShare, 0)} of the group's uses come from a single document`,
+    });
+  }
+  if (w.stability < FRAGILE_STABILITY) {
+    out.push({
+      tag: "unstable rank",
+      title: `Stays in the list in only ${formatPercent(w.stability, 0)} of resamples: its rank sits near the cut-off`,
+    });
+  }
+  return out;
 }
 
 function StabilityTable({
@@ -75,42 +89,52 @@ function StabilityTable({
               </tr>
             </thead>
             <tbody>
-              {words.map((w) => (
-                <tr
-                  key={w.term}
-                  className={cn("border-t border-border/60", fragile(w) && "bg-mark/25")}
-                >
-                  <td className="py-1.5 pr-2 font-mono text-[0.85rem]">
-                    {w.term}
-                    {fragile(w) ? (
-                      <span className="ml-1.5 font-sans text-[0.68rem] text-muted-foreground">
-                        few docs
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <div className="flex items-center gap-2">
-                      <span className="relative h-2 flex-1 rounded-full bg-muted" aria-hidden>
+              {words.map((w) => {
+                const why = flags(w);
+                return (
+                  <tr
+                    key={w.term}
+                    className={cn("border-t border-border/60", why.length > 0 && "bg-mark/25")}
+                  >
+                    <td className="py-1.5 pr-2 font-mono text-[0.85rem]">
+                      {w.term}
+                      {why.map((f) => (
                         <span
-                          className="absolute inset-y-0 left-0 rounded-full"
-                          style={{ width: `${Math.max(2, w.stability * 100)}%`, background: color }}
-                        />
-                      </span>
-                      <span className="tabular w-10 text-right text-xs text-muted-foreground">
-                        {formatPercent(w.stability, 0)}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="tabular py-1.5 pr-2 text-right text-xs whitespace-nowrap">
-                    {formatDecimal(Math.min(sign * w.zLower, sign * w.zUpper))} to{" "}
-                    {formatDecimal(Math.max(sign * w.zLower, sign * w.zUpper))}
-                  </td>
-                  <td className="tabular py-1.5 pr-2 text-right text-xs">{formatInt(w.docs)}</td>
-                  <td className="tabular py-1.5 text-right text-xs">
-                    {formatPercent(w.topDocShare, 0)}
-                  </td>
-                </tr>
-              ))}
+                          key={f.tag}
+                          title={f.title}
+                          className="ml-1.5 font-sans text-[0.68rem] whitespace-nowrap text-muted-foreground"
+                        >
+                          {f.tag}
+                        </span>
+                      ))}
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className="relative h-2 flex-1 rounded-full bg-muted" aria-hidden>
+                          <span
+                            className="absolute inset-y-0 left-0 rounded-full"
+                            style={{
+                              width: `${Math.max(2, w.stability * 100)}%`,
+                              background: color,
+                            }}
+                          />
+                        </span>
+                        <span className="tabular w-10 text-right text-xs text-muted-foreground">
+                          {formatPercent(w.stability, 0)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="tabular py-1.5 pr-2 text-right text-xs whitespace-nowrap">
+                      {formatDecimal(Math.min(sign * w.zLower, sign * w.zUpper))} to{" "}
+                      {formatDecimal(Math.max(sign * w.zLower, sign * w.zUpper))}
+                    </td>
+                    <td className="tabular py-1.5 pr-2 text-right text-xs">{formatInt(w.docs)}</td>
+                    <td className="tabular py-1.5 text-right text-xs">
+                      {formatPercent(w.topDocShare, 0)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -144,8 +168,9 @@ export function StabilityPanel({
         The z-score treats every word as an independent draw, but one press release can repeat a
         word dozens of times. So the documents in each group were resampled with replacement and
         both lists recomputed each time. A word kept in nearly every resample does not depend on a
-        few documents; a highlighted word drops out often or gets a quarter or more of its uses from
-        one document.
+        few documents. A highlighted word is tagged with the reason: &ldquo;unstable rank&rdquo;
+        when it stays in the list in under half of the resamples (often a word near the cut-off),
+        &ldquo;one doc ≥25%&rdquo; when a single document supplies a quarter or more of its uses.
       </p>
       {small ? (
         <p className="mt-2 text-sm text-destructive">
@@ -170,10 +195,11 @@ export function StabilityPanel({
         />
       </div>
       <p className="mt-4 text-xs text-muted-foreground">
-        With {formatInt(view.resamples)} resamples a kept share is accurate to about ±
-        {formatDecimal(100 * Math.sqrt(0.25 / view.resamples), 1)} percentage points. The z range is
-        the 2.5th to 97.5th percentile of the word&apos;s z-score across resamples, signed so that
-        larger means leaning further towards that column&apos;s group. Prior and α₀ are held fixed.
+        With {formatInt(view.resamples)} resamples a kept share has a Monte Carlo standard error of
+        at most {formatDecimal(100 * Math.sqrt(0.25 / view.resamples), 1)} percentage points. The z
+        range is the 2.5th to 97.5th percentile of the word&apos;s z-score across resamples, signed
+        so that larger means leaning further towards that column&apos;s group. Prior and α₀ are held
+        fixed.
       </p>
     </Panel>
   );

@@ -176,6 +176,9 @@ export interface FightinWordsView {
   topB: DistinctiveWord[];
   /** a sample of every word for the funnel plot: [log10 total count, z, flag] */
   cloud: Array<[number, number, 0 | 1 | 2]>;
+  /** words used by either group: the ones tested */
+  tested: number;
+  /** tested words with |z| >= Z_THRESHOLD */
   significant: number;
 }
 
@@ -262,6 +265,7 @@ export function computeFightinWords(
     topA,
     topB,
     cloud,
+    tested: order.length,
     significant,
   };
   if (fwCache.size > 200) fwCache.clear();

@@ -11,20 +11,30 @@
  * part (0.39 ΔWPS) and a word-length part (11.8 ΔSPW). Sentence length is
  * where transcription matters: in a transcript, the transcriber decides where
  * one spoken sentence ends and the next begins.
+ *
+ * Rows are not independent: documents come in batches from the same speaker's
+ * campaign, and debates in the same cycle share candidates and a transcription
+ * source. So the intervals resample clusters (speakers for documents, cycles
+ * for debate trends), not rows; see DR-006.
  */
 import {
   bootstrap,
   bootstrapMean,
+  clusterBootstrap,
+  clusterBootstrapMean,
   DEFAULT_SEED,
   meanAt,
   quantile,
   type BootstrapInterval,
 } from "@/lib/stats/bootstrap";
 import { olsLine } from "@/lib/stats/regression";
+import { signTest, tIntervalMean, type SignTest, type TInterval } from "@/lib/stats/small-sample";
 
 export const READABILITY_RESAMPLES = 10_000;
 /** Groups smaller than this get a point estimate but no interval. */
 export const MIN_GROUP_FOR_INTERVAL = 5;
+/** Groups from fewer clusters (speakers or cycles) than this get no interval either. */
+export const MIN_CLUSTERS_FOR_INTERVAL = 5;
 
 export type Register = "written" | "transcribed" | "address";
 
@@ -58,7 +68,12 @@ export interface DocRow {
 
 export interface GroupSummary {
   n: number;
-  /** mean grade; the interval is null below MIN_GROUP_FOR_INTERVAL */
+  /** distinct speakers (the resampled clusters) */
+  speakers: number;
+  /**
+   * mean grade per document, with an interval that resamples speakers; null
+   * below MIN_GROUP_FOR_INTERVAL documents or MIN_CLUSTERS_FOR_INTERVAL speakers
+   */
   grade: BootstrapInterval | null;
   meanGrade: number;
   meanWps: number;
@@ -75,10 +90,15 @@ export function summariseDocs(
   { resamples = READABILITY_RESAMPLES, seed = DEFAULT_SEED } = {},
 ): GroupSummary {
   const grades = rows.map((d) => d.fkGrade);
+  const keys = rows.map((d) => d.speakerId);
+  const speakers = new Set(keys).size;
   return {
     n: rows.length,
+    speakers,
     grade:
-      rows.length >= MIN_GROUP_FOR_INTERVAL ? bootstrapMean(grades, { resamples, seed }) : null,
+      rows.length >= MIN_GROUP_FOR_INTERVAL && speakers >= MIN_CLUSTERS_FOR_INTERVAL
+        ? clusterBootstrapMean(grades, keys, { resamples, seed })
+        : null,
     meanGrade: mean(grades),
     meanWps: mean(rows.map(wps)),
     meanSpw: mean(rows.map(spw)),
@@ -90,7 +110,7 @@ export interface CycleRegisterCell extends GroupSummary {
   register: Register;
 }
 
-/** Mean grade per election cycle and register, documents resampled within each cell. */
+/** Mean grade per election cycle and register, speakers resampled within each cell. */
 export function gradeByCycleAndRegister(
   rows: readonly DocRow[],
   cycles: readonly number[],
@@ -127,6 +147,15 @@ export interface WithinSpeakerGap {
   /** the sentence-length and word-length parts of the mean gap (they sum to it) */
   sentencePart: BootstrapInterval;
   wordPart: BootstrapInterval;
+  /**
+   * t intervals for the same three means. With 14 speakers the percentile
+   * bootstrap runs narrow, so the page leads with these.
+   */
+  gapT: TInterval;
+  sentencePartT: TInterval;
+  wordPartT: TInterval;
+  /** exact sign test on the per-speaker gaps */
+  sign: SignTest;
   /** standardised mean difference of the paired gaps (mean / SD) */
   dz: number;
   /** speakers whose transcribed texts grade lower than their written ones */
@@ -180,6 +209,10 @@ export function withinSpeakerGap(
     gap: bootstrapMean(gaps, opts),
     sentencePart: bootstrapMean(sentence, opts),
     wordPart: bootstrapMean(word, opts),
+    gapT: tIntervalMean(gaps),
+    sentencePartT: tIntervalMean(sentence),
+    wordPartT: tIntervalMean(word),
+    sign: signTest(gaps),
     dz: m / sd,
     lower: gaps.filter((g) => g < 0).length,
   };
@@ -197,14 +230,24 @@ export interface DebateRow {
 
 export interface DebateTrend {
   n: number;
-  /** change in candidates' mean grade per decade (OLS on the debate year), debates resampled */
+  /** election cycles the debates fall in (the resampled clusters) */
+  cycles: number;
+  /**
+   * change in candidates' mean grade per decade (OLS on the debate date), with
+   * an interval that resamples whole cycles
+   */
   perDecade: BootstrapInterval;
+  /**
+   * the same slope with debates resampled as if independent; shown on /methods
+   * only, to say how much narrower that would be
+   */
+  perDecadeDebates: BootstrapInterval;
   intercept: number;
-  /** pointwise 95% band for the fitted line at each year in `years` */
+  /** pointwise 95% band for the fitted line at each year in `years` (cycles resampled) */
   band: Array<{ year: number; fit: number; lower: number; upper: number }>;
 }
 
-/** Linear trend of candidates' grade over time, with a debate-level bootstrap. */
+/** Linear trend of candidates' grade over time, with a cycle-level (cluster) bootstrap. */
 export function debateTrend(
   rows: readonly DebateRow[],
   years: readonly number[],
@@ -213,22 +256,28 @@ export function debateTrend(
   const x = rows.map((d) => fractional(d.date));
   const y = rows.map((d) => d.fkCandidates);
   const fit = olsLine(x, y);
+  const slopeAt = (idx: readonly number[]) =>
+    olsLine(
+      idx.map((i) => x[i]),
+      idx.map((i) => y[i]),
+    );
   const fitsAt: number[][] = years.map(() => []);
-  // bootstrap() evaluates the statistic once on the original sample, then on
+  // The bootstrap evaluates the statistic once on the original sample, then on
   // each resample; only the resamples feed the band.
   let calls = 0;
-  const perDecade = bootstrap(
-    rows.length,
+  const perDecade = clusterBootstrap(
+    rows.map((d) => d.cycle),
     (idx) => {
-      const line = olsLine(
-        idx.map((i) => x[i]),
-        idx.map((i) => y[i]),
-      );
+      const line = slopeAt(idx);
       if (calls++ > 0) years.forEach((yr, j) => fitsAt[j].push(line.intercept + line.slope * yr));
       return line.slope * 10;
     },
     { resamples, seed },
   );
+  const perDecadeDebates = bootstrap(rows.length, (idx) => slopeAt(idx).slope * 10, {
+    resamples,
+    seed,
+  });
   const alpha = 1 - perDecade.level;
   const q = (vals: number[], p: number) =>
     quantile(
@@ -237,7 +286,9 @@ export function debateTrend(
     );
   return {
     n: rows.length,
+    cycles: perDecade.clusters ?? 0,
     perDecade,
+    perDecadeDebates,
     intercept: fit.intercept,
     band: years.map((yr, j) => ({
       year: yr,
@@ -255,7 +306,12 @@ export interface CycleMean {
   interval: BootstrapInterval | null;
 }
 
-/** Mean candidates' grade per cycle; debates resampled within the cycle. */
+/**
+ * Mean candidates' grade per cycle; debates resampled within the cycle. This
+ * describes the cycle's own debates: there is one cluster per cycle, so the
+ * interval cannot include cycle-to-cycle variation and is shown only as a
+ * description of that cycle.
+ */
 export function debateMeansByCycle(
   rows: readonly DebateRow[],
   { resamples = READABILITY_RESAMPLES, seed = DEFAULT_SEED } = {},

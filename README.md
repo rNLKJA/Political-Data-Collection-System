@@ -43,10 +43,12 @@ debate.
 The revival turned the CSVs into a reading room; the October 2026 upgrade adds the statistical
 checks and the evaluation that a careful analyst would want next.
 
-- **Uncertainty everywhere it matters.** Rates carry exact Poisson intervals, reading grades
-  carry percentile-bootstrap intervals over the unit the claim is about (documents, debates or
-  speakers), agreement scores carry Wilson intervals and kappa a bootstrap interval. Sample
-  sizes, resample counts and the seed (20261010) are shown next to the numbers.
+- **Uncertainty everywhere it matters.** Rates carry exact Poisson intervals. Reading grades
+  carry cluster-bootstrap intervals that resample whole speakers or whole election cycles,
+  because a campaign's documents and a cycle's debates are not independent, and the 14-speaker
+  paired gap carries a t interval. Agreement scores carry Wilson intervals and kappa a bootstrap
+  interval. Sample sizes, cluster counts, resample counts and the seed (20261010) are shown next
+  to the numbers.
 - **Word lists that admit their fragility.** Fightin' Words z-scores assume independent word
   tokens. Each comparison is re-run on 200 resamples of documents, and each top word shows how
   often it stays in the list, its z range, how many documents use it and how much of it comes
@@ -54,22 +56,26 @@ checks and the evaluation that a careful analyst would want next.
   stay in the top 30 in at least 90% of resamples; "county" (third for 2016) gets 30% of its
   uses from a single document.
 - **Readability with the transcriber in view.** Candidates' grade in general-election and VP
-  debates falls by 0.75 grade levels per decade (95% CI 0.58 to 0.94), but the same speakers'
-  transcribed remarks grade 5.5 levels below their written releases (95% CI 4.2 to 6.7, 14
-  speakers, paired), mostly through sentence length, and two transcripts of the same 2000
-  debate differ by up to 1.4 levels for one speaker.
+  debates falls by 0.75 grade levels per decade (95% CI 0.55 to 1.02, 49 debates in 14 cycles,
+  cycles resampled), but the same speakers' transcribed remarks grade 5.5 levels below their
+  written releases (95% t interval 4.1 to 6.9, 14 speakers, paired; all 14 lower), mostly
+  through sentence length, and two transcripts of the same 2000 debate differ by up to 1.4
+  levels for one speaker.
 - **An honest LLM evaluation.** A CAP-style codebook of 21 policy topics plus "none", a keyword
   dictionary frozen before the gold set was drawn, and a seeded, keyword-blind gold set of 120
   one-sentence excerpts. The keyword rules agree with the gold labels on 75.8% of excerpts (95%
   CI 67.4% to 82.6%), Cohen's kappa 0.59 (0.45 to 0.71). The gold labels are a single-annotator
-  draft prepared by the AI coding assistant that built the upgrade and not yet reviewed by a
-  person; the page says so above every score.
+  draft prepared by the AI coding assistant that built the upgrade, which also wrote the keyword
+  dictionary, so they are independent of neither labeller and not yet reviewed by a person; the
+  page says so above every score. A request that fails or is stopped is left out of the scores
+  for both labellers, never counted against the model.
 - **Statistics checked against Python.** `scripts/stats_reference.py` recomputes the Wilson
   intervals (statsmodels), kappa and per-class metrics (scikit-learn), McNemar's test
-  (statsmodels), OLS (SciPy), the bootstrap (numpy with a port of the same seeded generator),
-  the word-list stability (an independent Python port) and every readability summary (from the
-  database). The Vitest suite compares the TypeScript to these values.
-- **Written decisions.** Decision records DR-001 to DR-004 and a model card, rendered under
+  (statsmodels), OLS, t quantiles and the sign test (SciPy), the row and cluster bootstraps
+  (numpy with a port of the same seeded generator), the word-list stability (an independent
+  Python port) and every readability summary (from the database). The Vitest suite compares the
+  TypeScript to these values.
+- **Written decisions.** Decision records DR-001 to DR-006 and a model card, rendered under
   `/methods`.
 
 ### Ground rules
@@ -95,13 +101,16 @@ label the policy topic of short excerpts so it can be compared with the keyword 
    straight from your browser to `api.anthropic.com` (with the
    `anthropic-dangerous-direct-browser-access` header) or `api.openai.com`. Each request
    carries only the codebook, the coding rules and up to ten excerpts of 25 words or fewer with
-   opaque ids: no speaker, date, link or gold label. The page estimates tokens and cost first.
+   opaque ids: no speaker, date, link or gold label as metadata, although 35 of the 120 excerpts
+   name the candidate in the text. The page estimates tokens and cost first.
 4. Without a key, **Run the simulated demo** exercises the same harness, scoring, audit log and
    exports with a simulated labeller that calls nothing; its output is labelled "Simulated, not
    AI".
 
 Every model output is labelled "AI-generated". You can accept, correct or reject each run;
-corrections are logged as edits and never change the scores.
+corrections are logged as edits and never change the scores. If a request fails (key, network,
+rate limit, server error) or you press Stop, its excerpts are left out of the scores for both
+labellers and the run is marked incomplete; failed calls stay in the log, with nothing to accept.
 
 ### Viewing the AI audit log
 
@@ -158,7 +167,7 @@ Because the deployment uploads `web/` only, the documents are mirrored into `web
 │   └── _archive/                the first README
 ├── docs/
 │   ├── model-card.md            the two topic labellers
-│   └── decisions/               DR-001 to DR-004 and an index
+│   └── decisions/               DR-001 to DR-006 and an index
 ├── scripts/                     reproducible data build (uv, PEP 723 inline dependencies)
 │   ├── parity_check.py          runs the notebook code offline against the stored HTML/CSV
 │   ├── build_analytics.py       writes web/data/analytics.db and the test fixtures
@@ -179,7 +188,8 @@ Because the deployment uploads `web/` only, the documents are mirrored into `web
         ├── lib/                 framework-free logic and its tests
         │   ├── ai/              provider adapters, settings store, audit log, topic-label client
         │   ├── original/        TypeScript ports of the notebook code (dates, documents, splitter)
-        │   ├── stats/           Fightin' Words, Poisson, bootstrap, Wilson, kappa, McNemar, OLS, stability
+        │   ├── stats/           Fightin' Words, Poisson, row and cluster bootstrap, t, sign test, Wilson,
+        │   │                    kappa, McNemar, OLS, stability
         │   ├── topics/          codebook, keyword rules, gold set, scoring, simulated labeller
         │   ├── readability-stats.ts  grade by cycle, paired gap, debate trends
         │   └── textkit.ts       twin of scripts/textkit.py
@@ -220,10 +230,12 @@ uv run scripts/stats_reference.py  # ~15 s: reference values for the statistics 
 ```
 
 `build_topic_eval.py` rewrites only `web/src/data/topic-eval-items.json`; the gold labels in
-`web/src/data/topic-gold.json` are written by hand and never touched by a script. To review
-them, edit the labels (the file records who labelled them and a `status`), set `status` to
-`reviewed` and run the tests: the model card's baseline numbers are checked against the
-computed scores, so update `docs/model-card.md` and run `pnpm sync:docs` if they change.
+`web/src/data/topic-gold.json` are edited directly in that file and never touched by a script.
+The current labels are a draft prepared by the AI coding assistant that built the upgrade, which
+also wrote the keyword dictionary, so they are independent of neither labeller and await human
+review. To review them, edit the labels (the file records who labelled them and a `status`), set
+`status` to `reviewed` and run the tests: the model card's baseline numbers are checked against
+the computed scores, so update `docs/model-card.md` and run `pnpm sync:docs` if they change.
 
 `build_analytics.py` de-duplicates the 26 repeated listing rows, keeps only text in each
 candidate's own voice (interviewer, moderator and audience turns inside transcripts are dropped),

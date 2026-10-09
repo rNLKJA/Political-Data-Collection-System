@@ -44,7 +44,7 @@ export const NAV = [
     href: "/topics",
     label: "Topic labels",
     short: "Topic labels",
-    blurb: "An LLM against keyword rules on a hand-labelled set (bring your own key).",
+    blurb: "An LLM against keyword rules on 120 gold-labelled excerpts (bring your own key).",
   },
   {
     href: "/methods",

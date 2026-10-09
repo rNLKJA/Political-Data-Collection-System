@@ -45,14 +45,22 @@ const close = (a: number, b: number, tol = 1e-9) =>
   expect(Math.abs(a - b), `${a} vs ${b}`).toBeLessThanOrEqual(tol * Math.max(1, Math.abs(b)));
 
 describe("readability summaries", () => {
-  it("grade by cycle and register matches the numpy reference", () => {
+  it("grade by cycle and register matches the numpy reference (speakers resampled)", () => {
     const cells = gradeByCycleAndRegister(docs, CYCLES);
     expect(cells).toHaveLength(ref.cells.length);
     cells.forEach((c, i) => {
       const r = ref.cells[i];
-      expect([c.cycle, c.register, c.n]).toEqual([r.cycle, r.register, r.n]);
+      expect([c.cycle, c.register, c.n, c.speakers]).toEqual([
+        r.cycle,
+        r.register,
+        r.n,
+        r.speakers,
+      ]);
       close(c.meanGrade, r.mean, 1e-12);
       if (r.interval) {
+        expect(c.grade!.method).toBe("cluster bootstrap");
+        expect(c.grade!.clusters).toBe(r.interval.clusters);
+        close(c.grade!.estimate, r.interval.estimate, 1e-12);
         close(c.grade!.lower, r.interval.lower);
         close(c.grade!.upper, r.interval.upper);
       } else expect(c.grade).toBeNull();
@@ -67,21 +75,39 @@ describe("readability summaries", () => {
       close(g[k].lower, ref.gap[k].lower);
       close(g[k].upper, ref.gap[k].upper);
     }
+    for (const k of ["gapT", "sentencePartT", "wordPartT"] as const) {
+      close(g[k].estimate, ref.gap[k].estimate, 1e-12);
+      close(g[k].lower, ref.gap[k].lower, 1e-9);
+      close(g[k].upper, ref.gap[k].upper, 1e-9);
+    }
+    expect(g.sign).toMatchObject({
+      negative: ref.gap.sign.negative,
+      positive: ref.gap.sign.positive,
+    });
+    close(g.sign.p, ref.gap.sign.p, 1e-12);
+    // at n = 14 the t interval is wider than the percentile bootstrap
+    expect(g.gapT.upper - g.gapT.lower).toBeGreaterThan(g.gap.upper - g.gap.lower);
     close(g.dz, ref.gap.dz, 1e-10);
     // FK is linear in words per sentence and syllables per word, so the parts sum to the gap
     close(g.sentencePart.estimate + g.wordPart.estimate, g.gap.estimate, 1e-9);
   });
 
-  it("debate trends match", () => {
+  it("debate trends match, with whole cycles resampled", () => {
     const years = ref.general.trend.band.map((b: { year: number }) => b.year);
     for (const kind of ["general", "primary"] as const) {
       const rows = debates.filter((d) => (kind === "primary") === (d.kind === "primary"));
       const t = debateTrend(rows, years);
       const r = ref[kind].trend;
-      expect(t.n).toBe(r.n);
+      expect([t.n, t.cycles]).toEqual([r.n, r.cycles]);
+      expect(t.perDecade.method).toBe("cluster bootstrap");
       close(t.perDecade.estimate, r.perDecade.estimate, 1e-9);
       close(t.perDecade.lower, r.perDecade.lower, 1e-8);
       close(t.perDecade.upper, r.perDecade.upper, 1e-8);
+      close(t.perDecadeDebates.lower, r.perDecadeDebates.lower, 1e-8);
+      close(t.perDecadeDebates.upper, r.perDecadeDebates.upper, 1e-8);
+      expect(t.perDecade.upper - t.perDecade.lower).toBeGreaterThan(
+        t.perDecadeDebates.upper - t.perDecadeDebates.lower,
+      );
       t.band.forEach((b, j) => {
         close(b.lower, r.band[j].lower, 1e-8);
         close(b.upper, r.band[j].upper, 1e-8);

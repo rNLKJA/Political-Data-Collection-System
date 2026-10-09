@@ -1,7 +1,8 @@
 /**
- * The two distribution functions the evaluation needs beyond the gamma
- * functions in `poisson.ts`: the inverse standard normal CDF (for Wilson
- * intervals) and the binomial CDF (for McNemar's exact test). Checked against
+ * The distribution functions the statistics need beyond the gamma functions
+ * in `poisson.ts`: the inverse standard normal CDF (for Wilson intervals), the
+ * binomial CDF (for McNemar's exact test and the sign test) and Student's t
+ * CDF and quantile (for small-sample intervals of a mean). Checked against
  * SciPy in `stats-extra.test.ts` (reference values from
  * `scripts/stats_reference.py`).
  */
@@ -119,4 +120,78 @@ export function binomialCdf(k: number, n: number, p: number): number {
     sum += Math.exp(lnN - logGamma(i + 1) - logGamma(n - i + 1) + i * lp + (n - i) * lq);
   }
   return Math.min(1, sum);
+}
+
+/** Continued fraction for the incomplete beta function (modified Lentz). */
+function betaContinuedFraction(a: number, b: number, x: number): number {
+  const TINY = 1e-300;
+  const qab = a + b;
+  const qap = a + 1;
+  const qam = a - 1;
+  let c = 1;
+  let d = 1 - (qab * x) / qap;
+  if (Math.abs(d) < TINY) d = TINY;
+  d = 1 / d;
+  let h = d;
+  for (let m = 1; m <= 1000; m++) {
+    const m2 = 2 * m;
+    let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
+    d = 1 + aa * d;
+    if (Math.abs(d) < TINY) d = TINY;
+    c = 1 + aa / c;
+    if (Math.abs(c) < TINY) c = TINY;
+    d = 1 / d;
+    h *= d * c;
+    aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
+    d = 1 + aa * d;
+    if (Math.abs(d) < TINY) d = TINY;
+    c = 1 + aa / c;
+    if (Math.abs(c) < TINY) c = TINY;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < 1e-16) break;
+  }
+  return h;
+}
+
+/** Regularised incomplete beta function I_x(a, b). */
+export function regularizedBeta(x: number, a: number, b: number): number {
+  if (Number.isNaN(x)) return Number.NaN;
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const lnFront =
+    logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log1p(-x);
+  if (x < (a + 1) / (a + b + 2)) return (Math.exp(lnFront) * betaContinuedFraction(a, b, x)) / a;
+  return 1 - (Math.exp(lnFront) * betaContinuedFraction(b, a, 1 - x)) / b;
+}
+
+/** P(T <= t) for Student's t with `df` degrees of freedom. */
+export function studentTCdf(t: number, df: number): number {
+  if (Number.isNaN(t) || !(df > 0)) return Number.NaN;
+  if (t === Number.POSITIVE_INFINITY) return 1;
+  if (t === Number.NEGATIVE_INFINITY) return 0;
+  const tail = 0.5 * regularizedBeta(df / (df + t * t), df / 2, 0.5);
+  return t > 0 ? 1 - tail : tail;
+}
+
+/** Inverse of Student's t CDF, by bisection on `studentTCdf` (to about 1e-12). */
+export function studentTQuantile(p: number, df: number): number {
+  if (!(df > 0)) return Number.NaN;
+  if (!(p > 0 && p < 1)) {
+    if (p === 0) return Number.NEGATIVE_INFINITY;
+    if (p === 1) return Number.POSITIVE_INFINITY;
+    return Number.NaN;
+  }
+  if (p === 0.5) return 0;
+  if (p < 0.5) return -studentTQuantile(1 - p, df);
+  let lo = 0;
+  let hi = 1;
+  while (studentTCdf(hi, df) < p && hi < 1e12) hi *= 2;
+  for (let i = 0; i < 200 && hi - lo > 1e-14 * hi; i++) {
+    const mid = (lo + hi) / 2;
+    if (studentTCdf(mid, df) < p) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
 }

@@ -126,7 +126,7 @@ async function DistinctiveResults({
             <StatTile
               label="Words beyond |z| = 1.96"
               value={formatInt(view.significant)}
-              note="of 16,877 words; about 840 would cross it by chance alone"
+              note={`of ${formatInt(view.tested)} words used by either group; about ${formatInt(Math.round(0.05 * view.tested))} would cross it if the groups did not differ (a rough guide, given the prior)`}
             />
             <StatTile
               label="Prior strength α₀"
