@@ -6,7 +6,7 @@ A descriptive reading room for US campaign documents (2016 to 2024) and 179 deba
 (49 general-election and vice-presidential, 130 primary; 1960 to 2024), built on a personal scraper of
 [The American Presidency Project](https://www.presidency.ucsb.edu) at UC Santa Barbara.
 
-**Live demo:** coming soon (Vercel project `campaign-text-lab`)
+**Live demo:** [campaign-text-lab.vercel.app](https://campaign-text-lab.vercel.app)
 
 [![CI](https://github.com/rNLKJA/Political-Data-Collection-System/actions/workflows/ci.yml/badge.svg)](https://github.com/rNLKJA/Political-Data-Collection-System/actions/workflows/ci.yml)
 
@@ -140,6 +140,22 @@ Two rules keep the derived data neutral:
 - **Quotations.** Topic snippets illustrate how a topic is discussed. A quoted window is skipped
   (the next use, then the next document, is tried) if it names another candidate or uses a charged
   word such as "liar", "racist" or "Hitler" (`CHARGED_WORDS` in `build_analytics.py`).
+
+### Looking at the data yourself
+
+The site has no accounts and no writable database: everything it shows comes from
+`web/data/analytics.db`, a read-only SQLite file committed to the repository and bundled with the
+deployment. Open it with any SQLite browser, or from the command line:
+
+```bash
+sqlite3 web/data/analytics.db ".tables"
+sqlite3 web/data/analytics.db "SELECT date, title, n_candidates FROM debates ORDER BY date DESC LIMIT 5"
+sqlite3 web/data/analytics.db "SELECT key, value FROM meta"   # build provenance (source CSV hashes)
+```
+
+Tables: `speakers`, `documents` (metadata and statistics, no text), `terms` (compressed postings),
+`concepts`, `concept_hits`, `concept_snippets` (quotations of 25 words or fewer), `debates`,
+`debate_speakers` and `debate_turns`.
 
 ### Parity with the original code
 
