@@ -21,12 +21,12 @@ The subject is US presidential politics. Any chart that puts two candidates side
 
 ## Options considered
 
-| Option                                         | Why not                                                                                     |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Party colours, as most election sites use      | Makes every chart a red-against-blue reading.                                               |
-| Rank candidates by readability or vocabulary   | Invites reading a description of text as a judgement of a person.                           |
-| Quote whatever the matching window says        | Relays attacks between candidates under a neutral-looking heading.                          |
-| One rule set for everyone (chosen)             | Rules can be stated, tested and criticised, and apply the same way to everyone.             |
+| Option                                       | Why not                                                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------- |
+| Party colours, as most election sites use    | Makes every chart a red-against-blue reading.                                   |
+| Rank candidates by readability or vocabulary | Invites reading a description of text as a judgement of a person.               |
+| Quote whatever the matching window says      | Relays attacks between candidates under a neutral-looking heading.              |
+| One rule set for everyone (chosen)           | Rules can be stated, tested and criticised, and apply the same way to everyone. |
 
 ## Why
 

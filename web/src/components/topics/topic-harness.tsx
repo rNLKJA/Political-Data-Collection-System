@@ -9,7 +9,7 @@ import { AiGeneratedBadge } from "@/components/ai/ai-badge";
 import { SourceLink } from "@/components/common/bits";
 import { Button } from "@/components/ui/button";
 import { controlClass, Field, Select } from "@/components/ui/field";
-import { getAuditStore } from "@/lib/ai/audit-log";
+import { getAuditStore, substitutedModel } from "@/lib/ai/audit-log";
 import { describeAiError } from "@/lib/ai/errors";
 import { estimateCostUsd, PROVIDERS } from "@/lib/ai/providers";
 import { activeKey, activeModel } from "@/lib/ai/settings";
@@ -388,7 +388,7 @@ function RunResults({
             {run.simulated
               ? "no model was called"
               : `${PROVIDERS[run.provider as "anthropic" | "openai"].label} ${run.model}`}
-            {run.result.servedModel && run.result.servedModel !== run.model
+            {substitutedModel(run.model, run.result.servedModel)
               ? ` (served as ${run.result.servedModel})`
               : ""}
           </p>

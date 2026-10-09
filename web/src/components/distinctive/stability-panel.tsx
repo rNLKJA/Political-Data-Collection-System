@@ -171,7 +171,7 @@ export function StabilityPanel({
       </div>
       <p className="mt-4 text-xs text-muted-foreground">
         With {formatInt(view.resamples)} resamples a kept share is accurate to about ±
-        {formatDecimal(100 * Math.sqrt(0.25 / view.resamples), 0)} percentage points. The z range is
+        {formatDecimal(100 * Math.sqrt(0.25 / view.resamples), 1)} percentage points. The z range is
         the 2.5th to 97.5th percentile of the word&apos;s z-score across resamples, signed so that
         larger means leaning further towards that column&apos;s group. Prior and α₀ are held fixed.
       </p>

@@ -21,12 +21,12 @@ Coding text into policy topics is a classic task in political science, tradition
 
 ## Options considered
 
-| Option                                               | Why not                                                                                              |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Label the whole archive with an LLM and chart topics | No budget, no way to check the labels, and topic charts by candidate invite partisan readings.       |
-| A server route with the site's own key               | Costs money per visitor and invites abuse of a public endpoint.                                     |
-| Commit a reference LLM run                           | No budget to make one honestly; a single run also hides run-to-run variation.                       |
-| Compare against the existing 44-topic vocabulary     | Gold excerpts drawn from keyword hits would favour the keywords; the sample here is keyword-blind.  |
+| Option                                               | Why not                                                                                               |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Label the whole archive with an LLM and chart topics | No budget, no way to check the labels, and topic charts by candidate invite partisan readings.        |
+| A server route with the site's own key               | Costs money per visitor and invites abuse of a public endpoint.                                       |
+| Commit a reference LLM run                           | No budget to make one honestly; a single run also hides run-to-run variation.                         |
+| Compare against the existing 44-topic vocabulary     | Gold excerpts drawn from keyword hits would favour the keywords; the sample here is keyword-blind.    |
 | BYOK evaluation against frozen rules (chosen)        | No cost to the site, no key on the server, and anyone can repeat the comparison with their own model. |
 
 ## Why

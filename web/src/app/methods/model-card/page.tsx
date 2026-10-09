@@ -14,6 +14,7 @@ export const metadata: Metadata = {
 
 export default function ModelCardPage() {
   const doc = getModelCard();
+  const title = doc.title.replace(/^Model card:\s*/i, "");
   return (
     <article className="mx-auto max-w-3xl px-4 pt-10 pb-6 sm:px-6 sm:pt-14">
       <Link
@@ -24,7 +25,7 @@ export default function ModelCardPage() {
       </Link>
       <p className="kicker mt-6">Model card</p>
       <h1 className="mt-3 text-[2rem] leading-[1.1] font-medium tracking-tight sm:text-[2.5rem]">
-        {doc.title.replace(/^Model card:\s*/i, "")}
+        {title.charAt(0).toUpperCase() + title.slice(1)}
       </h1>
       <div className="mt-8">
         <Markdown>{doc.body}</Markdown>

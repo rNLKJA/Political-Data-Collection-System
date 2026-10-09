@@ -52,6 +52,9 @@ const TOC = [
   ["change", "What I'd change"],
 ] as const;
 
+/** "-5.47" -> "−5.5" (a true minus sign) */
+const minus = (v: number, d = 1) => v.toFixed(d).replace("-", "\u2212");
+
 function Step({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
   return (
     <li className="relative rounded-md border border-border bg-background/60 p-4">
@@ -604,10 +607,10 @@ rate  = k / N × 10,000      interval scaled the same way`}
                 Because the grade is linear in words per sentence (WPS) and syllables per word
                 (SPW), a difference of mean grades splits exactly into a sentence-length part and a
                 word-length part. For the {readability.gap.speakers.length} speakers with enough of
-                both kinds of text, the mean gap is {readability.gap.gap.estimate.toFixed(1)} grade
-                levels (95% CI {readability.gap.gap.lower.toFixed(1)} to{" "}
-                {readability.gap.gap.upper.toFixed(1)}), of which{" "}
-                {readability.gap.sentencePart.estimate.toFixed(1)} comes from sentence length. These
+                both kinds of text, the mean gap is {minus(readability.gap.gap.estimate)} grade
+                levels (95% CI {minus(readability.gap.gap.lower)} to{" "}
+                {minus(readability.gap.gap.upper)}), of which{" "}
+                {minus(readability.gap.sentencePart.estimate)} comes from sentence length. These
                 intervals cover sampling, not measurement: they do not include the effect of who
                 transcribed a debate, which the page shows separately with two events the archive
                 holds in two transcripts.
@@ -642,8 +645,8 @@ rate  = k / N × 10,000      interval scaled the same way`}
                 ; until reviewed, every score is provisional.
               </p>
               <p>
-                <strong>Labellers.</strong> The keyword rules ({KEYWORD_RULES_VERSION}) were written
-                before the set was drawn and frozen. The model sees the codebook (21 CAP-style
+                <strong>Labellers.</strong> The keyword rules, {KEYWORD_RULES_VERSION}, were written
+                before the set was drawn and then frozen. The model sees the codebook (21 CAP-style
                 topics and &ldquo;none&rdquo;), five coding rules and up to ten excerpts with opaque
                 ids per request; the system prompt is {formatInt(promptChars)} characters. Defaults:{" "}
                 {ANTHROPIC_MODELS[0].label} at temperature 0, or {ANTHROPIC_MODELS[1].label} at low
@@ -677,9 +680,9 @@ rate  = k / N × 10,000      interval scaled the same way`}
                 anyone said.
               </li>
               <li>
-                <strong>Own voice.</strong> Text is attributed by speaker labels. Interviewer turns
-                without a label stay in, and labelled turns by people not on the candidate lists are
-                dropped.
+                <strong>Own voice.</strong> Text is attributed by speaker labels: turns labelled
+                with anyone other than the document&apos;s own speaker are dropped, and interviewer
+                text without a label stays in. Debate roles depend on curated candidate lists.
               </li>
               <li>
                 <strong>Independence.</strong> z-scores and Poisson intervals treat word tokens as

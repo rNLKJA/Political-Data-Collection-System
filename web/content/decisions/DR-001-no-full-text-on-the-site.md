@@ -19,12 +19,12 @@ The 2025 scrapers saved the full text of 7,582 campaign documents and 179 debate
 
 ## Options considered
 
-| Option                                              | Why not                                                                                       |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Full-text search and reading on the site            | Republishes the archive's compilation and takes readers away from the source.                 |
-| Counts only, no quotations                          | Readers could not see what a number refers to without leaving the site for every check.       |
-| Longer excerpts behind a click                      | Still republishing in practice, and harder to keep within a stated limit.                     |
-| Derived data plus short linked quotations (chosen)  | Every number can be checked at the source; the archive stays the place to read.              |
+| Option                                             | Why not                                                                                 |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Full-text search and reading on the site           | Republishes the archive's compilation and takes readers away from the source.           |
+| Counts only, no quotations                         | Readers could not see what a number refers to without leaving the site for every check. |
+| Longer excerpts behind a click                     | Still republishing in practice, and harder to keep within a stated limit.               |
+| Derived data plus short linked quotations (chosen) | Every number can be checked at the source; the archive stays the place to read.         |
 
 ## Why
 

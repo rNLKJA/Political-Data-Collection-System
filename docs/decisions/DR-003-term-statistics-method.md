@@ -2,9 +2,9 @@
 
 **Decision:** Compare vocabularies with the weighted log-odds ratio and informative Dirichlet prior of Monroe, Colaresi and Quinn (2008), report term rates per 10,000 words with exact Poisson intervals, and, since the October 2026 upgrade, check every pair of top-word lists by resampling documents.
 
-| Status   | Decided                                          | Recorded        | Owner                   |
-| -------- | ------------------------------------------------ | --------------- | ----------------------- |
-| Accepted | 2026 (revival); bootstrap check 10 October 2026  | 10 October 2026 | Sunchuangyu (Rin) Huang |
+| Status   | Decided                                         | Recorded        | Owner                   |
+| -------- | ----------------------------------------------- | --------------- | ----------------------- |
+| Accepted | 2026 (revival); bootstrap check 10 October 2026 | 10 October 2026 | Sunchuangyu (Rin) Huang |
 
 ## Context
 
@@ -19,12 +19,12 @@ Two tools rest on word counts. Distinctive words asks which words separate two g
 
 ## Options considered
 
-| Option                                              | Why not                                                                                                   |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Ratios of relative frequencies, or tf-idf           | No account of sample size; rare words dominate.                                                           |
-| Chi-square or log-likelihood (G²) keyness           | Well known, but gives no shrinkage, and its p-values carry the same independence assumption.              |
-| Fightin' Words with an uninformative prior          | Shrinks every word by the same amount regardless of how common it is.                                     |
-| Topic models                                         | Harder to explain, unstable between runs, and less directly descriptive than word counts.                |
+| Option                                                      | Why not                                                                                                 |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Ratios of relative frequencies, or tf-idf                   | No account of sample size; rare words dominate.                                                         |
+| Chi-square or log-likelihood (G²) keyness                   | Well known, but gives no shrinkage, and its p-values carry the same independence assumption.            |
+| Fightin' Words with an uninformative prior                  | Shrinks every word by the same amount regardless of how common it is.                                   |
+| Topic models                                                | Harder to explain, unstable between runs, and less directly descriptive than word counts.               |
 | Informative-prior log-odds, with a bootstrap check (chosen) | A standard method in political text analysis, with the dependence problem measured rather than ignored. |
 
 ## Why

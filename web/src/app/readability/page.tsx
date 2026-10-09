@@ -76,12 +76,9 @@ export default function ReadabilityPage() {
       const c = r.docs.cells.find((x) => x.cycle === cycle && x.register === reg)!;
       return {
         key: `${reg}-${cycle}`,
-        label: (
-          <>
-            {REGISTER_LABEL[reg]}, <span className="tabular">{cycle}</span>
-          </>
-        ),
-        note: `${formatInt(c.n)} documents · ${formatDecimal(c.meanWps, 1)} words per sentence`,
+        group: REGISTER_LABEL[reg],
+        label: <span className="tabular">{cycle}</span>,
+        note: `${formatInt(c.n)} docs · ${formatDecimal(c.meanWps, 1)} words/sentence`,
         estimate: c.meanGrade,
         lower: c.grade?.lower ?? null,
         upper: c.grade?.upper ?? null,

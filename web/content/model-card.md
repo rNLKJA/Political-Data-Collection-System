@@ -4,10 +4,10 @@ The topic-label evaluation on `/topics` compares two labellers that assign one p
 
 ## Model details
 
-| Labeller           | What it is                                                                                                                                                             | Version                          |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| Keyword rules      | A hand-written dictionary of words and phrases per topic and one counting rule: most matches wins, a tie goes to the earliest match, no match is "no policy topic".     | keywords-v1, frozen 10 Oct 2026  |
-| LLM (your own key) | A general-purpose language model given the codebook, the coding rules and up to ten excerpts per request, answering in a fixed JSON schema. Default Claude Haiku 4.5. | prompt topic-labels-v1           |
+| Labeller           | What it is                                                                                                                                                            | Version                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| Keyword rules      | A hand-written dictionary of words and phrases per topic and one counting rule: most matches wins, a tie goes to the earliest match, no match is "no policy topic".   | keywords-v1, frozen 10 Oct 2026 |
+| LLM (your own key) | A general-purpose language model given the codebook, the coding rules and up to ten excerpts per request, answering in a fixed JSON schema. Default Claude Haiku 4.5. | prompt topic-labels-v1          |
 
 Both use the same codebook: 21 policy topics modelled on the major topics of the Comparative Agendas Project (CAP), adapted for single campaign sentences, plus "no policy topic". It is not the official CAP master codebook. Source: `web/src/lib/topics/codebook.ts`, `keyword-rules.ts` and `web/src/lib/ai/topic-labels.ts`.
 
@@ -31,10 +31,10 @@ Not intended for: labelling the archive at scale, comparing candidates or partie
 
 Scored against the gold labels, on the same excerpts for both labellers. Intervals are 95%: Wilson for shares, percentile bootstrap over excerpts for kappa (10,000 resamples, seed 20261010).
 
-| Labeller      | Excerpts | Agreement with gold        | Cohen's kappa       | Agreement on the 50 policy excerpts |
-| ------------- | -------- | -------------------------- | ------------------- | ----------------------------------- |
-| Keyword rules | 120      | 75.8% (67.4% to 82.6%)     | 0.59 (0.45 to 0.71) | 54% (40% to 67%)                    |
-| LLM           | 20 to 120, chosen by the visitor | computed in the browser at run time | same | same |
+| Labeller      | Excerpts                         | Agreement with gold                 | Cohen's kappa       | Agreement on the 50 policy excerpts |
+| ------------- | -------------------------------- | ----------------------------------- | ------------------- | ----------------------------------- |
+| Keyword rules | 120                              | 75.8% (67.4% to 82.6%)              | 0.59 (0.45 to 0.71) | 54% (40% to 67%)                    |
+| LLM           | 20 to 120, chosen by the visitor | computed in the browser at run time | same                | same                                |
 
 No LLM results are published: the project has no budget for model calls, so each visitor's run is their own and appears only in their browser and their exports. The paired comparison reports the difference in agreement and in kappa (paired bootstrap) and McNemar's exact test.
 
