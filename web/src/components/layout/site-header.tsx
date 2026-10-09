@@ -10,7 +10,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
         <Link
           href="/"
-          className="group flex items-baseline gap-2"
+          className="group flex shrink-0 items-baseline gap-2 whitespace-nowrap"
           aria-label={`${SITE.name}, home`}
         >
           <span
@@ -23,10 +23,10 @@ export function SiteHeader() {
             Campaign Text <span className="italic">Lab</span>
           </span>
         </Link>
-        <nav aria-label="Main" className="ml-auto hidden md:block">
+        <nav aria-label="Main" className="ml-auto hidden lg:block">
           <NavLinks />
         </nav>
-        <div className="ml-auto flex items-center gap-2 md:ml-2">
+        <div className="ml-auto flex items-center gap-2 lg:ml-2">
           <ThemeToggle />
           <MobileNav />
         </div>

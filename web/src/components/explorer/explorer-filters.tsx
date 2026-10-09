@@ -36,7 +36,7 @@ export function ExplorerFilters({
           value={current.speaker ?? ""}
           onChange={(e) => go({ speaker: e.target.value || undefined })}
         >
-          <option value="">All 54 speakers</option>
+          <option value="">All {speakers.length} speakers</option>
           {speakers.map((s) => (
             <option key={s.slug} value={s.slug}>
               {s.name} ({s.docs})

@@ -8,3 +8,4 @@ next-env.d.ts
 src/lib/__fixtures__
 src/data/*.json
 AGENTS.md
+.vitest

@@ -1,4 +1,4 @@
-import { ArrowUpRight, Info } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Info } from "lucide-react";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
@@ -151,8 +151,8 @@ export function ToolCard({
       <span className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{children}</span>
       <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
         Open
-        <ArrowUpRight
-          className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+        <ArrowRight
+          className="size-4 transition-transform group-hover:translate-x-0.5"
           aria-hidden
         />
       </span>

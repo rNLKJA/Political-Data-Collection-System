@@ -172,19 +172,35 @@ export function cleanDocument(content: string, speaker: string): CleanResult {
   };
 }
 
-/** Concept patterns are lists of space-separated token sequences. */
-export function matchConcept(tokens: string[], patterns: string[]): Array<[number, number]> {
-  const seqs = patterns.map((p) => p.split(" "));
+const startsUpper = (w: string) => w.slice(0, 1) !== w.slice(0, 1).toLowerCase();
+
+/**
+ * Concept patterns are lists of space-separated token sequences. `tokens` are
+ * lower-cased; `cased` holds the same tokens as spelled in the source. Words are
+ * compared lower-cased, but a pattern word starting with a capital ("Democratic")
+ * only matches a source word that also starts with one, so without `cased` it
+ * never matches. Mirrors `match_concepts` in `scripts/textkit.py`.
+ */
+export function matchConcept(
+  tokens: string[],
+  patterns: string[],
+  cased?: string[],
+): Array<[number, number]> {
+  const seqs = patterns.map((p) => {
+    const seq = p.split(" ");
+    return { seq, low: seq.map((w) => w.toLowerCase()) };
+  });
   const hits: Array<[number, number]> = [];
   let i = 0;
   while (i < tokens.length) {
     let matched = 0;
-    for (const seq of seqs) {
+    for (const { seq, low } of seqs) {
       const L = seq.length;
-      if (i + L <= tokens.length && tokens[i] === seq[0]) {
+      if (i + L <= tokens.length && tokens[i] === low[0]) {
         let ok = true;
-        for (let k = 1; k < L; k++) {
-          if (tokens[i + k] !== seq[k]) {
+        for (let k = 0; k < L; k++) {
+          const caseOk = !startsUpper(seq[k]) || (!!cased && startsUpper(cased[i + k] ?? ""));
+          if (tokens[i + k] !== low[k] || !caseOk) {
             ok = false;
             break;
           }
@@ -198,6 +214,33 @@ export function matchConcept(tokens: string[], patterns: string[]): Array<[numbe
     } else i++;
   }
   return hits;
+}
+
+/**
+ * Character ranges in `text` where a concept matches, merged with an optional
+ * primary range (the stored highlight of a snippet) and sorted.
+ */
+export function conceptRanges(
+  text: string,
+  patterns: string[],
+  primary?: [number, number],
+): Array<[number, number]> {
+  const toks = tokenize(text);
+  const hits = matchConcept(
+    toks.map((t) => t.text),
+    patterns,
+    toks.map((t) => text.slice(t.start, t.end)),
+  );
+  const ranges: Array<[number, number]> = hits.map(([ti, tl]) => [
+    toks[ti].start,
+    toks[ti + tl - 1].end,
+  ]);
+  if (primary && primary[1] > primary[0]) {
+    const [a, b] = primary;
+    const rest = ranges.filter(([s, e]) => e <= a || s >= b);
+    return [...rest, primary].sort((x, y) => x[0] - y[0]);
+  }
+  return ranges;
 }
 
 /** Normalise a user-typed search term the same way the index was built. */

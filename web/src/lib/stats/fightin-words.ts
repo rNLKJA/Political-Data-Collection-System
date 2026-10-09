@@ -25,6 +25,8 @@ export interface FightinWordsResult {
 export const DEFAULT_ALPHA0 = 10_000;
 /** |z| above this is conventionally read as "clearly distinctive" (two-sided p < 0.05). */
 export const Z_THRESHOLD = 1.96;
+/** |z| beyond which a word is a strong signal even among thousands tested (p < 0.001). */
+export const Z_STRONG = 3.29;
 
 export function fightinWords(
   yA: ArrayLike<number>,
