@@ -124,7 +124,7 @@ async function DistinctiveResults({
             <StatTile
               label="Words beyond |z| = 1.96"
               value={formatInt(view.significant)}
-              note="out of 16,877 indexed words"
+              note={`of ${formatInt(view.compared)} compared · about ${formatInt(Math.round(view.compared * 0.05))} would pass by chance · ${formatInt(view.strong)} beyond 3.29`}
             />
             <StatTile
               label="Prior strength α₀"
@@ -246,8 +246,10 @@ async function DistinctiveResults({
           </section>
 
           <Callout title="How to read this">
-            A high z-score says a word is used at a clearly different rate by the two groups, after
-            allowing for chance. It says nothing about whether the word is used approvingly or
+            A high z-score says the two groups use a word at rates further apart than its counts
+            would usually vary. Each word is tested on its own, so among thousands of words about 5%
+            pass |z| = 1.96 by chance alone; the top of each list, or |z| above 3.29, is the
+            stronger signal. A score says nothing about whether the word is used approvingly or
             critically, and press-release boilerplate (names, places, “county”) counts like any
             other word. Stop-words are excluded; words must appear in at least five documents.
             Details and formula on the{" "}
