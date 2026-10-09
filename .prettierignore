@@ -2,7 +2,8 @@ node_modules/
 build/
 dist/
 .next/
-_archive/
+original/
+web/
 *.min.js
 *.min.css
 package-lock.json
@@ -10,3 +11,4 @@ yarn.lock
 pnpm-lock.yaml
 *.csv
 *.ipynb
+*.db

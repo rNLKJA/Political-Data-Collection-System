@@ -1,45 +1,4 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Virtual environments
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
+# --- OS / editors ---
 .DS_Store
 .DS_Store?
 ._*
@@ -47,13 +6,49 @@ venv.bak/
 .Trashes
 ehthumbs.db
 Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Project specific
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+.ipynb_checkpoints
+.pytest_cache/
+.ruff_cache/
+
+# Scraper run artefacts (original notebooks)
 document_cache.pkl
+extraction_cache.pkl
 extraction_checkpoint.json
+checkpoint.json
+sample_documents.csv
 *.log
 
-# Data files (uncomment if you want to exclude data files)
-# *.csv
-# *.json
-# *.pkl
+# --- Node / Next.js (web/) ---
+node_modules/
+.next/
+out/
+.vercel
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+coverage/
+playwright-report/
+test-results/
