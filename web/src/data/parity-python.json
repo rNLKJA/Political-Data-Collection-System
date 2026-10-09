@@ -1,0 +1,55 @@
+{
+  "generatedBy": "scripts/parity_check.py",
+  "note": "Original notebook functions executed offline against the stored CSV/HTML.",
+  "debates": {
+    "transcripts": 179,
+    "fieldsChecked": [
+      "Extracted_Title",
+      "Extracted_Date",
+      "Participants",
+      "Moderators",
+      "Debate_Content_Text",
+      "Participants_List"
+    ],
+    "mismatches": {
+      "Extracted_Title": 0,
+      "Extracted_Date": 0,
+      "Participants": 0,
+      "Moderators": 0,
+      "Debate_Content_Text": 0,
+      "Participants_List": 0
+    },
+    "exampleMismatches": [],
+    "listingRows": 180,
+    "listingDateMatches": 180,
+    "listingTitleMatches": 180
+  },
+  "documents": {
+    "documents": 7582,
+    "fieldsChecked": [
+      "Document_Title",
+      "Document_Date",
+      "Document_Content",
+      "Speaker",
+      "Speaker_Title",
+      "Document_Type",
+      "Location",
+      "Video_Available",
+      "Word_Count"
+    ],
+    "mismatches": {
+      "Document_Title": 0,
+      "Document_Date": 0,
+      "Document_Content": 0,
+      "Speaker": 0,
+      "Speaker_Title": 0,
+      "Document_Type": 0,
+      "Location": 0,
+      "Video_Available": 0,
+      "Word_Count": 0
+    },
+    "exampleMismatches": [],
+    "listingDateMatches": 7582,
+    "sampleListingDatesMatch": true
+  }
+}
