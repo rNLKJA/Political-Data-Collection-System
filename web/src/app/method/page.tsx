@@ -254,7 +254,7 @@ export default function MethodPage() {
                       <ParityResult py={r.py} />
                     </dd>
                     <dt className="text-muted-foreground">TypeScript test</dt>
-                    <dd className="font-mono break-all text-muted-foreground">{r.ts}</dd>
+                    <dd className="font-mono wrap-anywhere text-muted-foreground">{r.ts}</dd>
                   </dl>
                 </li>
               ))}
