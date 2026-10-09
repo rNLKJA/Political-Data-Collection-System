@@ -111,6 +111,10 @@ pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build
 `pnpm typecheck` runs `next typegen && tsc --noEmit`, because Next 16's global route types
 (`PageProps`, `LayoutProps`) only exist after type generation.
 
+Deploying: the production site at <https://campaign-text-lab.vercel.app> is the Vercel project
+`campaign-text-lab`, deployed from inside `web/` (`vercel deploy --prod`). It needs no environment
+variables: there are no accounts, sessions or secrets.
+
 ## How the data artefacts are generated
 
 Everything the site shows is derived from `original/*.csv` by two scripts, run from the repository
@@ -162,6 +166,10 @@ sqlite3 web/data/analytics.db "SELECT key, value FROM meta"   # build provenance
 Tables: `speakers`, `documents` (metadata and statistics, no text), `terms` (compressed postings),
 `concepts`, `concept_hits`, `concept_snippets` (quotations of 25 words or fewer), `debates`,
 `debate_speakers` and `debate_turns`.
+
+Because visitors never write anything, there is no hosted database (such as Turso) and no admin
+"records" area: the live site reads exactly this file, so opening it locally shows every record the
+site uses.
 
 ### Parity with the original code
 
