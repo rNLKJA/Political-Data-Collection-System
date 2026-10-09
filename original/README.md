@@ -8,17 +8,17 @@ build scripts in [`../scripts`](../scripts) only ever read these files.
 
 ## What is inside
 
-| File                                | What it is                                                                                                       |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `documents.ipynb`                   | Campaign documents collector. Phase 1 pages through the category listing; phase 2 fetches each document's text. |
+| File                                | What it is                                                                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `documents.ipynb`                   | Campaign documents collector. Phase 1 pages through the category listing; phase 2 fetches each document's text.            |
 | `debates.ipynb`                     | Debate collector. Phase 1 reads the debate listing; phase 2 splits each transcript into participants, moderators and text. |
-| `campaign_documents.csv`            | 7,582 campaign documents (2016-01-01 to 2024-11-06) with metadata and full text.                                 |
-| `debates_data.csv`                  | The debate listing: 180 rows (179 unique transcripts), date, title, links.                                       |
-| `debates_data_processed.csv`        | 179 transcripts (1960 to 2024) with participants, moderators, plain text and the original HTML.                  |
-| `documents_processed_optimized.csv` | Two-row output of the notebook's sample-data cell (an unfinished step, kept as-is).                              |
-| `pyproject.toml`                    | Black and isort settings used to format the notebooks.                                                           |
-| `README-2025.md`                    | The project README as it stood before the revival.                                                               |
-| `_archive/README.original.md`       | The very first README.                                                                                           |
+| `campaign_documents.csv`            | 7,582 campaign documents (2016-01-01 to 2024-11-06) with metadata and full text.                                           |
+| `debates_data.csv`                  | The debate listing: 180 rows (179 unique transcripts), date, title, links.                                                 |
+| `debates_data_processed.csv`        | 179 transcripts (1960 to 2024) with participants, moderators, plain text and the original HTML.                            |
+| `documents_processed_optimized.csv` | Two-row output of the notebook's sample-data cell (an unfinished step, kept as-is).                                        |
+| `pyproject.toml`                    | Black and isort settings used to format the notebooks.                                                                     |
+| `README-2025.md`                    | The project README as it stood before the revival.                                                                         |
+| `_archive/README.original.md`       | The very first README.                                                                                                     |
 
 Paths inside the notebooks are relative (`./campaign_documents.csv`, `./debates_data.csv`), and the
 CSVs moved together with the notebooks, so the notebooks still run from this folder.
