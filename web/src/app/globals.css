@@ -1,0 +1,266 @@
+@import "tailwindcss";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Campaign Text Lab design tokens.
+ * Light: parchment and ink with a muted navy accent.
+ * Dark: a microfilm reader (green-black field, warm phosphor text).
+ * Chart series are a validated neutral categorical palette (no party colours):
+ * ochre, teal, plum, olive, rose, steel. Checked with the dataviz validator for
+ * both surfaces (adjacent CVD and normal-vision separation, 3:1 contrast).
+ * Role colours, form-control borders and muted chart marks also reach 3:1
+ * against the card surface (WCAG 1.4.11); "other" is a cool slate so it never
+ * reads as the warm moderator grey.
+ */
+:root {
+  --background: #f3eee3;
+  --foreground: #1e1a15;
+  --card: #fbf8f1;
+  --card-foreground: #1e1a15;
+  --popover: #fbf8f1;
+  --popover-foreground: #1e1a15;
+  --primary: #24395a;
+  --primary-foreground: #fbf8f1;
+  --secondary: #e8e0cf;
+  --secondary-foreground: #1e1a15;
+  --muted: #ebe4d6;
+  --muted-foreground: #5b5346;
+  --accent: #e4dccb;
+  --accent-foreground: #1e1a15;
+  --destructive: #9b2c1f;
+  --border: #d8cdb8;
+  --input: #8f8371;
+  --ring: #24395a;
+  --rule: #2b261f;
+  --mark: #ecdba3;
+  --mark-foreground: #1e1a15;
+  --radius: 0.375rem;
+
+  --series-1: #a86f0e;
+  --series-2: #00897b;
+  --series-3: #8350a8;
+  --series-4: #5e8419;
+  --series-5: #c2557d;
+  --series-6: #3e7bb0;
+  --role-candidate: #24395a;
+  --role-moderator: #9b8f7a;
+  --role-other: #6b7a84;
+  --chart-grid: #e2d9c7;
+  --chart-axis: #b9ad96;
+  --chart-muted: #988c76;
+  --chart-surface: #fbf8f1;
+
+  --chart-1: var(--series-1);
+  --chart-2: var(--series-2);
+  --chart-3: var(--series-3);
+  --chart-4: var(--series-4);
+  --chart-5: var(--series-5);
+
+  --sidebar: #fbf8f1;
+  --sidebar-foreground: #1e1a15;
+  --sidebar-primary: #24395a;
+  --sidebar-primary-foreground: #fbf8f1;
+  --sidebar-accent: #e4dccb;
+  --sidebar-accent-foreground: #1e1a15;
+  --sidebar-border: #d8cdb8;
+  --sidebar-ring: #24395a;
+}
+
+.dark {
+  --background: #0e1210;
+  --foreground: #e4dfd0;
+  --card: #151a17;
+  --card-foreground: #e4dfd0;
+  --popover: #151a17;
+  --popover-foreground: #e4dfd0;
+  --primary: #a9bedd;
+  --primary-foreground: #0e1210;
+  --secondary: #1d2420;
+  --secondary-foreground: #e4dfd0;
+  --muted: #1a201c;
+  --muted-foreground: #a7a192;
+  --accent: #222a25;
+  --accent-foreground: #e4dfd0;
+  --destructive: #e08a7a;
+  --border: #29312c;
+  --input: #5f6b66;
+  --ring: #a9bedd;
+  --rule: #c9c3b2;
+  --mark: #4d4422;
+  --mark-foreground: #f1ead6;
+
+  --series-1: #b9862c;
+  --series-2: #1c9c88;
+  --series-3: #a06fc8;
+  --series-4: #78a034;
+  --series-5: #d06e95;
+  --series-6: #5c96cc;
+  --role-candidate: #a9bedd;
+  --role-moderator: #77715f;
+  --role-other: #7a8790;
+  --chart-grid: #222925;
+  --chart-axis: #3d4640;
+  --chart-muted: #66706a;
+  --chart-surface: #151a17;
+
+  --sidebar: #151a17;
+  --sidebar-foreground: #e4dfd0;
+  --sidebar-primary: #a9bedd;
+  --sidebar-primary-foreground: #0e1210;
+  --sidebar-accent: #222a25;
+  --sidebar-accent-foreground: #e4dfd0;
+  --sidebar-border: #29312c;
+  --sidebar-ring: #a9bedd;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+  --font-heading: var(--font-newsreader);
+  --font-serif: var(--font-newsreader);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-rule: var(--rule);
+  --color-mark: var(--mark);
+  --color-mark-foreground: var(--mark-foreground);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
+  --color-series-6: var(--series-6);
+  --color-role-candidate: var(--role-candidate);
+  --color-role-moderator: var(--role-moderator);
+  --color-role-other: var(--role-other);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    scroll-padding-top: 5rem;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings:
+      "kern" 1,
+      "liga" 1;
+    text-rendering: optimizeLegibility;
+  }
+  /* A whisper of paper grain; the microfilm reader gets a soft lamp vignette. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.35;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .38 0 0 0 0 .28 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .dark body::before {
+    opacity: 1;
+    background-image: radial-gradient(
+      ellipse 80% 60% at 50% 30%,
+      rgb(228 223 208 / 0.045),
+      transparent 70%
+    );
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+    font-optical-sizing: auto;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--mark);
+    color: var(--mark-foreground);
+  }
+}
+
+@layer components {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Catalogue label: small upper-case mono, the archive's index-card voice. */
+  .kicker {
+    @apply font-mono text-[0.7rem] font-medium tracking-[0.14em] text-muted-foreground uppercase;
+  }
+  /* Newspaper section rule: two hairlines, full width. */
+  .double-rule {
+    border-top: 3px double var(--rule);
+  }
+  .prose-archive {
+    @apply text-[0.975rem] leading-relaxed text-foreground/90;
+  }
+  .prose-archive p + p {
+    @apply mt-3;
+  }
+  .prose-archive a,
+  a.inline-link {
+    @apply text-primary underline decoration-primary/40 underline-offset-[3px] transition-colors hover:decoration-primary;
+  }
+  .prose-archive code,
+  code.inline {
+    @apply rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.85em];
+  }
+  mark.hit {
+    @apply rounded-[2px] bg-mark px-0.5 text-mark-foreground;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

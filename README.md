@@ -1,15 +1,14 @@
 <div align="center">
 
-# Political Data Collection System
+# Campaign Text Lab
 
-Scrape, clean and structure United States campaign documents and debate transcripts from the UC Santa Barbara American Presidency Project.
+A descriptive reading room for US campaign documents (2016 to 2024) and 179 debate transcripts
+(49 general-election and vice-presidential, 130 primary; 1960 to 2024), built on a personal scraper of
+[The American Presidency Project](https://www.presidency.ucsb.edu) at UC Santa Barbara.
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Jupyter](https://img.shields.io/badge/Jupyter-Notebook-F37626?logo=jupyter&logoColor=white)](https://jupyter.org/)
-[![pandas](https://img.shields.io/badge/pandas-data-150458?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
-[![BeautifulSoup](https://img.shields.io/badge/BeautifulSoup4-parsing-43B02A)](https://www.crummy.com/software/BeautifulSoup/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000)](https://github.com/psf/black)
-[![Status](https://img.shields.io/badge/status-research%20dataset-blue)]()
+**Live demo:** [campaign-text-lab.vercel.app](https://campaign-text-lab.vercel.app)
+
+[![CI](https://github.com/rNLKJA/Political-Data-Collection-System/actions/workflows/ci.yml/badge.svg)](https://github.com/rNLKJA/Political-Data-Collection-System/actions/workflows/ci.yml)
 
 </div>
 
@@ -17,89 +16,174 @@ Scrape, clean and structure United States campaign documents and debate transcri
 
 ## Overview
 
-This project gathers publicly available political content from [presidency.ucsb.edu](https://www.presidency.ucsb.edu) and turns it into tidy CSV datasets ready for analysis. It is built around two Jupyter notebooks, each handling a different kind of source material.
+In August 2025 I wrote two Jupyter notebooks that collect public pages from The American
+Presidency Project (APP): every document in its campaign-documents category, and every debate
+transcript it holds. They wrote four CSV files. In 2026 the project was revived as a website that
+reads those CSVs, without scraping anything again, and turns them into a small set of descriptive
+tools.
 
-- **`documents.ipynb`** collects campaign documents: speeches, remarks, statements, interviews and addresses, along with their metadata and full text.
-- **`debates.ipynb`** collects presidential and vice presidential debate transcripts, with participants, moderators and venue details pulled out into their own fields.
+| Tool                  | What it shows                                                                                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Explorer**          | 7,556 documents filtered by candidate, document type, year and title; documents per month; links to every source page.                                                             |
+| **Distinctive words** | Monroe, Colaresi and Quinn's (2008) weighted log-odds with an informative Dirichlet prior between any two candidates or election cycles, with a funnel plot and example documents. |
+| **Debates**           | 179 transcripts split into 43,662 speaking turns: talk share, turn lengths, moderator share and reading grade from 1960 to 2024, and a turn-by-turn view of each debate.           |
+| **Term timeline**     | Mentions per 10,000 words for 44 policy topics or any indexed word, with exact Poisson 95% intervals and short quoted passages.                                                    |
+| **Method**            | The scraper design, the parity checks, and live playgrounds for the ported date normaliser, transcript splitter and readability code.                                              |
 
-Everything here is sourced from material that is already public. The scrapers are rate limited and use polite request patterns so they sit lightly on the source server.
+Key results carried over from the original collection: 7,582 listing rows (7,556 unique
+documents, 2016-01-01 to 2024-11-06, all extracted successfully) under 54 speakers, and 179 debate
+transcripts from Kennedy and Nixon in Chicago (26 September 1960) to the 2024 vice-presidential
+debate.
 
-## Highlights
+### Ground rules
 
-- **Two focused collectors** so campaign documents and debates each get extraction logic suited to their page layout.
-- **Metadata plus full text** captured in one pass: dates, titles, speakers, document types, word counts and the complete content.
-- **Concurrent scraping** with a thread pool to move through paginated results quickly without hammering the server.
-- **Resumable runs** via a pickle cache and a JSON checkpoint, so a long collection can stop and pick up where it left off.
-- **Date normalisation** that standardises mixed date formats into ISO timestamps.
-- **Retry and backoff** built into the HTTP session to ride out the occasional network hiccup.
+The subject is politically sensitive, so the site is strictly descriptive: every speaker goes
+through the same code, colours identify the groups being compared and never parties, nothing is
+scored for sentiment or quality, and nothing is predicted. Default views compare election cycles
+rather than people.
 
-## Tech Stack
+## Tech stack
 
-| Layer         | Tool                                                 |
-| ------------- | ---------------------------------------------------- |
-| Language      | Python 3.9+                                          |
-| Environment   | Jupyter Notebook                                     |
-| HTTP          | `requests` with retry adapter and connection pooling |
-| HTML parsing  | `BeautifulSoup4` (+ `lxml`)                          |
-| Data handling | `pandas`                                             |
-| Concurrency   | `concurrent.futures.ThreadPoolExecutor`              |
-| Progress      | `tqdm`                                               |
-| Caching       | `pickle` cache + JSON checkpoint                     |
+|             | Original (2025)                                                                        | Revived (2026)                                                                                                         |
+| ----------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Collection  | Python, Jupyter, `requests` with retries, BeautifulSoup4, `ThreadPoolExecutor`, `tqdm` | none (the CSVs are read as they are)                                                                                   |
+| Data        | CSV files                                                                              | A 9 MB read-only SQLite file built by Python scripts run with `uv`                                                     |
+| App         | none                                                                                   | Next.js 16 (App Router, Cache Components), React 19, TypeScript (strict), Tailwind CSS 4, shadcn config, `next-themes` |
+| Server data | none                                                                                   | Node's built-in `node:sqlite`, queried from Server Components                                                          |
+| Charts      | none                                                                                   | Hand-rolled SVG with a validated neutral palette                                                                       |
+| Tests       | none                                                                                   | Vitest parity suites against the original CSVs; GitHub Actions CI                                                      |
 
-## Getting Started
+## Repository structure
 
-### Prerequisites
-
-Install the dependencies:
-
-```bash
-pip install jupyter pandas requests beautifulsoup4 lxml tqdm
+```
+.
+├── README.md
+├── LICENSE                      MIT, code only (not the APP-sourced text)
+├── .github/workflows/ci.yml     lint, format, typecheck, test, build; offline parity of the notebooks
+├── original/                    the August 2025 project, moved with git mv, contents unchanged
+│   ├── README.md                what is inside and how to run it
+│   ├── documents.ipynb          campaign documents collector
+│   ├── debates.ipynb            debate transcripts collector
+│   ├── campaign_documents.csv   7,582 rows with full text
+│   ├── debates_data.csv         180-row debate listing
+│   ├── debates_data_processed.csv  179 transcripts with participants, moderators, text and HTML
+│   ├── documents_processed_optimized.csv  2-row sample output
+│   ├── pyproject.toml           black/isort settings
+│   ├── README-2025.md           the README before the revival
+│   └── _archive/                the first README
+├── scripts/                     reproducible data build (uv, PEP 723 inline dependencies)
+│   ├── parity_check.py          runs the notebook code offline against the stored HTML/CSV
+│   ├── build_analytics.py       writes web/data/analytics.db and the test fixtures
+│   ├── date_fixtures.py         CPython 3.11 date results for the TypeScript differential test
+│   ├── textkit.py               tokeniser, document cleaning, readability, topic list
+│   └── debatekit.py             debate turn segmentation and roles
+└── web/                         the Next.js app (Vercel root directory)
+    ├── data/analytics.db        derived, read-only database (no running text)
+    └── src/
+        ├── app/                 routes: /, /explorer, /distinctive, /debates, /debates/[slug], /timeline, /method
+        ├── components/          ui/ primitives, layout/, charts/, and one folder per tool
+        ├── data/                generated JSON (parity summary, debate candidate list)
+        ├── hooks/               element width, URL-driven filters
+        ├── lib/                 framework-free logic and its tests
+        │   ├── original/        TypeScript ports of the notebook code (dates, documents, splitter)
+        │   ├── stats/           Fightin' Words and exact Poisson intervals
+        │   └── textkit.ts       twin of scripts/textkit.py
+        └── server/              server-only data access (node:sqlite)
 ```
 
-### Running the collectors
+## Local development
 
-Launch Jupyter and open whichever notebook you need:
+Requirements: Node 22.13 or newer (for `node:sqlite`; Node 24 recommended), pnpm 10, and
+[uv](https://docs.astral.sh/uv/) if you want to rebuild the data.
 
 ```bash
-jupyter notebook
+cd web
+pnpm install
+pnpm dev            # http://localhost:3536
 ```
 
-**Campaign documents (`documents.ipynb`)**
+Quality gates (the same as CI):
 
-1. Run the cells in order. The first pass scrapes document metadata across the paginated category listing and writes `campaign_documents.csv`.
-2. The second pass reads that CSV back in and extracts the full text for each document, saving progress to `document_cache.pkl` and `extraction_checkpoint.json` as it goes.
-3. If a run is interrupted, just re-run the cells. The checkpoint lets it resume rather than start over.
+```bash
+pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build
+```
 
-**Debates (`debates.ipynb`)**
+`pnpm typecheck` runs `next typegen && tsc --noEmit`, because Next 16's global route types
+(`PageProps`, `LayoutProps`) only exist after type generation.
 
-1. Run the cells in order to scrape the debate listing into `debates_data.csv`.
-2. The processing cells then pull each transcript apart into participants, moderators and content, writing `debates_data_processed.csv`.
+## How the data artefacts are generated
 
-You can tune the worker count, rate-limit delays and page size near the top of each notebook to match your machine and how gently you want to treat the source.
+Everything the site shows is derived from `original/*.csv` by two scripts, run from the repository
+root:
 
-## Datasets
+```bash
+uv run scripts/parity_check.py     # ~15 s: the notebooks' own code, offline, against the CSVs
+uv run scripts/build_analytics.py  # ~1-4 min: writes web/data/analytics.db and fixtures
+uv run scripts/date_fixtures.py    # ~10 s, Python 3.11 on macOS: date differential fixtures
+```
 
-| File                                | What it holds                                                      |
-| ----------------------------------- | ------------------------------------------------------------------ |
-| `campaign_documents.csv`            | Campaign documents with metadata and full text                     |
-| `documents_processed_optimized.csv` | Processed campaign documents                                       |
-| `debates_data.csv`                  | Raw debate listing (date, title, links)                            |
-| `debates_data_processed.csv`        | Debate transcripts split into participants, moderators and content |
+`build_analytics.py` de-duplicates the 26 repeated listing rows, keeps only text in each
+candidate's own voice (interviewer, moderator and audience turns inside transcripts are dropped),
+and stores per-document metadata and Flesch-Kincaid statistics, a compressed inverted index of
+16,877 words (counts only), counts for a 44-topic controlled vocabulary with quotations of at most
+25 words, and per-turn word counts for the debates. It also writes reference values for the
+TypeScript tests (Fightin' Words z-scores, and Poisson intervals from SciPy).
 
-**Campaign document fields** include the URL, publication date (ISO), title, speaker and speaker title, document type, location, full content, word count and extraction status.
+Two rules keep the derived data neutral:
 
-**Debate fields** include the date, title, participant and moderator lists, full transcript text and HTML, and video availability.
+- **Debate roles.** A speaker counts as a candidate only if they are on the cycle's list of debate
+  participants, belong to the party holding the debate when it is a primary, and are named in the
+  page's Participants block when it has one. Recorded clips played during a debate ("[begin video
+  clip]" ... "[end video clip]", "(from videotape.)", "VIDEO CLIP OF ...") are counted as "Recorded
+  clips", not as anyone's live speech, so a president quoted in a clip at the other party's primary
+  is not listed as taking part. The build asserts both rules for every debate.
+- **Quotations.** Topic snippets illustrate how a topic is discussed. A quoted window is skipped
+  (the next use, then the next document, is tried) if it names another candidate or uses a charged
+  word such as "liar", "racist" or "Hitler" (`CHARGED_WORDS` in `build_analytics.py`).
 
-## Research Applications
+### Looking at the data yourself
 
-The resulting datasets suit a range of political science and computational social science work, such as political speech and rhetoric analysis, tracking how campaign messaging shifts over time, debate analysis, and natural language processing on political text.
+The site has no accounts and no writable database: everything it shows comes from
+`web/data/analytics.db`, a read-only SQLite file committed to the repository and bundled with the
+deployment. Open it with any SQLite browser, or from the command line:
 
-## Legal and Ethical Notes
+```bash
+sqlite3 web/data/analytics.db ".tables"
+sqlite3 web/data/analytics.db "SELECT date, title, n_candidates FROM debates ORDER BY date DESC LIMIT 5"
+sqlite3 web/data/analytics.db "SELECT key, value FROM meta"   # build provenance (source CSV hashes)
+```
 
-- All data is collected from publicly available sources.
-- Rate limiting is in place to keep the load on the source server light.
-- The datasets are intended for research and educational use. Please follow the source site's terms of service and any relevant institutional policies.
+Tables: `speakers`, `documents` (metadata and statistics, no text), `terms` (compressed postings),
+`concepts`, `concept_hits`, `concept_snippets` (quotations of 25 words or fewer), `debates`,
+`debate_speakers` and `debate_turns`.
 
-## License
+### Parity with the original code
 
-Intended for research and educational use. Please ensure compliance with relevant institutional policies and the source site's data usage guidelines.
+- `scripts/parity_check.py` executes the notebook cells verbatim with the HTTP layer replaced by a
+  stub that serves pages rebuilt from the stored data: all 179 transcripts, 180 listing rows and
+  7,582 documents come out field-for-field identical.
+- The Vitest suites run the TypeScript ports (`web/src/lib/original`) over the same CSVs: date
+  normalisation, document type, location, word count and paragraph join for all 7,582 documents,
+  and participants, moderators and plain text for all 179 transcripts, all exact. The revival's
+  own tokeniser and readability code are checked document by document against the Python build.
+- `datetime.fromisoformat` is ported in full from CPython 3.11 (basic and week formats, any
+  separator, fractions, offsets). `scripts/date_fixtures.py` runs it and the notebook's two date
+  functions over about 2,400 hand-picked and generated strings, and the TypeScript must return
+  exactly the same for every one.
+
+## Source, licence and provenance
+
+Source texts: Gerhard Peters and John T. Woolley, The American Presidency Project, University of
+California, Santa Barbara. Copyright © The American Presidency Project. The website does not
+re-publish documents or transcripts: it shows counts, metadata and quotations of 25 words or fewer,
+each linked to its source page.
+
+The code is MIT-licensed; the licence does not cover the APP-sourced text. The original notebooks
+and the CSVs they produced are preserved unchanged in [`original/`](original/) for reference.
+
+## Credits
+
+Personal project by Sunchuangyu (Rin) Huang ([@rNLKJA](https://github.com/rNLKJA)), collected
+August 2025 and revived in 2026. Data courtesy of The American Presidency Project. Method:
+Monroe, B. L., Colaresi, M. P. and Quinn, K. M. (2008), "Fightin' Words: Lexical Feature Selection
+and Evaluation for Identifying the Content of Political Conflict", _Political Analysis_ 16(4).
