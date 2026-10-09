@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CirclePlay } from "lucide-react";
 import Link from "next/link";
 
 import { MonthlyColumns } from "@/components/charts/monthly-columns";
@@ -47,6 +47,12 @@ export default function HomePage() {
                 className="inline-flex h-11 items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
                 Open the explorer <ArrowRight className="size-4" aria-hidden />
+              </Link>
+              <Link
+                href="/tour"
+                className="inline-flex h-11 items-center gap-2 rounded-md border border-border px-5 text-sm font-medium hover:bg-accent"
+              >
+                <CirclePlay className="size-4" aria-hidden /> Take the tour
               </Link>
               <Link
                 href="/methods"

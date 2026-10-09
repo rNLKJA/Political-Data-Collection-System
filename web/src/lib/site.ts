@@ -7,7 +7,7 @@ export const SITE = {
   app: "https://www.presidency.ucsb.edu",
 } as const;
 
-/** `short` is the label in the desktop header, where seven links share one line. */
+/** `short` is the label in the desktop header, where eight links share one line. */
 export const NAV = [
   {
     href: "/explorer",
@@ -51,6 +51,12 @@ export const NAV = [
     label: "Methods",
     short: "Methods",
     blurb: "Collection, checks, statistics, decision records and AI use.",
+  },
+  {
+    href: "/tour",
+    label: "Guided tour",
+    short: "Tour",
+    blurb: "Three recorded walkthroughs and screenshots of every tool.",
   },
 ] as const;
 
