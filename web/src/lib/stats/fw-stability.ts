@@ -59,8 +59,8 @@ export interface StabilityResult {
 
 export const STABILITY_RESAMPLES = 200;
 
-/** The k-th largest value of `score` over the indices where `use` is true (−∞ if fewer). */
-export function kthLargest(score: ArrayLike<number>, k: number, use: (i: number) => boolean) {
+/** The k-th largest value of `score` over the indices where `include` is true (−∞ if fewer). */
+export function kthLargest(score: ArrayLike<number>, k: number, include: (i: number) => boolean) {
   // A size-k min-heap: O(V log k).
   const heap: number[] = [];
   const up = (i: number) => {
@@ -85,7 +85,7 @@ export function kthLargest(score: ArrayLike<number>, k: number, use: (i: number)
   };
   for (let i = 0; i < score.length; i++) {
     const v = score[i];
-    if (Number.isNaN(v) || !use(i)) continue;
+    if (Number.isNaN(v) || !include(i)) continue;
     if (heap.length < k) {
       heap.push(v);
       up(heap.length - 1);
