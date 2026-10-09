@@ -10,7 +10,12 @@
 import { pySplit } from "@/lib/py";
 
 export type DocumentType =
-  "Debate" | "Speech/Remarks" | "Interview" | "Statement" | "Address" | "Document";
+  | "Debate"
+  | "Speech/Remarks"
+  | "Interview"
+  | "Statement"
+  | "Address"
+  | "Document";
 
 /** The four characters `\n\n` that separate paragraphs in `Document_Content`. */
 export const LITERAL_PARAGRAPH_SEPARATOR = "\\n\\n";
