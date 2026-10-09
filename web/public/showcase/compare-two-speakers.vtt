@@ -1,0 +1,37 @@
+WEBVTT
+
+1
+00:00:00.370 --> 00:00:03.120
+Step 1 of 9. Distinctive words compares the vocabulary of any two groups of campaign documents.
+
+2
+00:00:03.120 --> 00:00:06.510
+Step 2 of 9. Group A: choose a candidate, Hillary Clinton, and the 2016 cycle.
+
+3
+00:00:06.510 --> 00:00:10.430
+Step 3 of 9. Group B: Bernie Sanders, in the same cycle.
+
+4
+00:00:10.430 --> 00:00:14.370
+Step 4 of 9. Each side's document count and indexed words, and how many words pass |z| = 1.96.
+
+5
+00:00:14.370 --> 00:00:18.570
+Step 5 of 9. Every word gets a Fightin' Words z-score; the funnel plot shows all of them at once.
+
+6
+00:00:18.570 --> 00:00:22.190
+Step 6 of 9. The ranked lists: a z-score bar and uses per 10,000 words in each group.
+
+7
+00:00:22.190 --> 00:00:27.360
+Step 7 of 9. Select a word to see the documents in each group that use it most.
+
+8
+00:00:27.360 --> 00:00:30.820
+Step 8 of 9. Every example links back to the full text on The American Presidency Project.
+
+9
+00:00:30.820 --> 00:00:35.680
+Step 9 of 9. Resampling documents 200 times shows how stable each top word is.

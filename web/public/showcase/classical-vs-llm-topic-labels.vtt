@@ -1,0 +1,37 @@
+WEBVTT
+
+1
+00:00:00.370 --> 00:00:03.320
+Step 1 of 9. Topic labels: a keyword dictionary and a language model label the same gold-labelled excerpts.
+
+2
+00:00:03.320 --> 00:00:06.970
+Step 2 of 9. The keyword baseline runs for everyone: agreement and Cohen's kappa with 95% intervals.
+
+3
+00:00:06.970 --> 00:00:11.770
+Step 3 of 9. The model is optional and runs on the visitor's own key. Open AI settings.
+
+4
+00:00:11.770 --> 00:00:18.450
+Step 4 of 9. Paste a key (here a placeholder, not a real key). It stays in this browser tab.
+
+5
+00:00:18.450 --> 00:00:22.800
+Step 5 of 9. Save. Requests go straight from the browser to the provider, never to this site.
+
+6
+00:00:22.800 --> 00:00:31.230
+Step 6 of 9. A seeded sample of 40 excerpts, sent in four requests. Mocked AI response for illustration.
+
+7
+00:00:31.230 --> 00:00:36.480
+Step 7 of 9. Both labellers scored on the same excerpts: intervals, paired difference and McNemar's test.
+
+8
+00:00:36.480 --> 00:00:42.780
+Step 8 of 9. Every label is marked AI-generated. Correct one, then accept the run.
+
+9
+00:00:42.780 --> 00:00:53.600
+Step 9 of 9. Every call is in the AI audit log with prompt, answer, latency, tokens and decision.

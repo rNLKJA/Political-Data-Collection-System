@@ -1,0 +1,335 @@
+{
+  "journeys": {
+    "classical-vs-llm-topic-labels": {
+      "title": "Classical vs LLM topic labels",
+      "mp4": "/showcase/classical-vs-llm-topic-labels.mp4",
+      "mp4Bytes": 2104678,
+      "poster": "/showcase/classical-vs-llm-topic-labels.webp",
+      "posterBytes": 69372,
+      "vtt": "/showcase/classical-vs-llm-topic-labels.vtt",
+      "gif": "docs/showcase/classical-vs-llm-topic-labels.gif",
+      "gifBytes": 7011357,
+      "width": 1280,
+      "height": 800,
+      "durationS": 53.6,
+      "steps": [
+        {
+          "step": 1,
+          "atS": 0.37
+        },
+        {
+          "step": 2,
+          "atS": 3.32
+        },
+        {
+          "step": 3,
+          "atS": 6.97
+        },
+        {
+          "step": 4,
+          "atS": 11.77
+        },
+        {
+          "step": 5,
+          "atS": 18.45
+        },
+        {
+          "step": 6,
+          "atS": 22.8
+        },
+        {
+          "step": 7,
+          "atS": 31.23
+        },
+        {
+          "step": 8,
+          "atS": 36.48
+        },
+        {
+          "step": 9,
+          "atS": 42.78
+        }
+      ]
+    },
+    "compare-two-speakers": {
+      "title": "Compare two speakers",
+      "mp4": "/showcase/compare-two-speakers.mp4",
+      "mp4Bytes": 1204347,
+      "poster": "/showcase/compare-two-speakers.webp",
+      "posterBytes": 50414,
+      "vtt": "/showcase/compare-two-speakers.vtt",
+      "gif": "docs/showcase/compare-two-speakers.gif",
+      "gifBytes": 5591500,
+      "width": 1280,
+      "height": 800,
+      "durationS": 35.7,
+      "steps": [
+        {
+          "step": 1,
+          "atS": 0.37
+        },
+        {
+          "step": 2,
+          "atS": 3.12
+        },
+        {
+          "step": 3,
+          "atS": 6.51
+        },
+        {
+          "step": 4,
+          "atS": 10.43
+        },
+        {
+          "step": 5,
+          "atS": 14.37
+        },
+        {
+          "step": 6,
+          "atS": 18.57
+        },
+        {
+          "step": 7,
+          "atS": 22.19
+        },
+        {
+          "step": 8,
+          "atS": 27.36
+        },
+        {
+          "step": 9,
+          "atS": 30.82
+        }
+      ]
+    },
+    "sixty-years-of-debates": {
+      "title": "Sixty years of debates",
+      "mp4": "/showcase/sixty-years-of-debates.mp4",
+      "mp4Bytes": 1432801,
+      "poster": "/showcase/sixty-years-of-debates.webp",
+      "posterBytes": 37798,
+      "vtt": "/showcase/sixty-years-of-debates.vtt",
+      "gif": "docs/showcase/sixty-years-of-debates.gif",
+      "gifBytes": 5992228,
+      "width": 1280,
+      "height": 800,
+      "durationS": 44.9,
+      "steps": [
+        {
+          "step": 1,
+          "atS": 0.38
+        },
+        {
+          "step": 2,
+          "atS": 3.56
+        },
+        {
+          "step": 3,
+          "atS": 7.74
+        },
+        {
+          "step": 4,
+          "atS": 13.34
+        },
+        {
+          "step": 5,
+          "atS": 16.6
+        },
+        {
+          "step": 6,
+          "atS": 20.76
+        },
+        {
+          "step": 7,
+          "atS": 25.84
+        },
+        {
+          "step": 8,
+          "atS": 30.26
+        },
+        {
+          "step": 9,
+          "atS": 39.13
+        }
+      ]
+    }
+  },
+  "screens": [
+    {
+      "file": "01-landing-light",
+      "png": "docs/showcase/01-landing-light.png",
+      "pngBytes": 188352,
+      "webp": "/showcase/screens/01-landing-light.webp",
+      "webpBytes": 63932,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "02-landing-dark",
+      "png": "docs/showcase/02-landing-dark.png",
+      "pngBytes": 148595,
+      "webp": "/showcase/screens/02-landing-dark.webp",
+      "webpBytes": 67620,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "03-explorer",
+      "png": "docs/showcase/03-explorer.png",
+      "pngBytes": 146100,
+      "webp": "/showcase/screens/03-explorer.webp",
+      "webpBytes": 44370,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "04-distinctive-words",
+      "png": "docs/showcase/04-distinctive-words.png",
+      "pngBytes": 151933,
+      "webp": "/showcase/screens/04-distinctive-words.webp",
+      "webpBytes": 53862,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "05-word-stability",
+      "png": "docs/showcase/05-word-stability.png",
+      "pngBytes": 177123,
+      "webp": "/showcase/screens/05-word-stability.webp",
+      "webpBytes": 79156,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "06-debates",
+      "png": "docs/showcase/06-debates.png",
+      "pngBytes": 151181,
+      "webp": "/showcase/screens/06-debates.webp",
+      "webpBytes": 45522,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "07-debate-turns",
+      "png": "docs/showcase/07-debate-turns.png",
+      "pngBytes": 137574,
+      "webp": "/showcase/screens/07-debate-turns.webp",
+      "webpBytes": 39054,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "08-term-timeline",
+      "png": "docs/showcase/08-term-timeline.png",
+      "pngBytes": 147240,
+      "webp": "/showcase/screens/08-term-timeline.webp",
+      "webpBytes": 54214,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "09-readability",
+      "png": "docs/showcase/09-readability.png",
+      "pngBytes": 161191,
+      "webp": "/showcase/screens/09-readability.webp",
+      "webpBytes": 57868,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "10-byok-settings",
+      "png": "docs/showcase/10-byok-settings.png",
+      "pngBytes": 155396,
+      "webp": "/showcase/screens/10-byok-settings.webp",
+      "webpBytes": 66690,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "11-topic-evaluation",
+      "png": "docs/showcase/11-topic-evaluation.png",
+      "pngBytes": 178790,
+      "webp": "/showcase/screens/11-topic-evaluation.webp",
+      "webpBytes": 78324,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "12-ai-audit-log",
+      "png": "docs/showcase/12-ai-audit-log.png",
+      "pngBytes": 174794,
+      "webp": "/showcase/screens/12-ai-audit-log.webp",
+      "webpBytes": 64598,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "13-methods",
+      "png": "docs/showcase/13-methods.png",
+      "pngBytes": 228682,
+      "webp": "/showcase/screens/13-methods.webp",
+      "webpBytes": 80058,
+      "width": 1440,
+      "height": 900,
+      "docsWidth": 1440,
+      "docsHeight": 900
+    },
+    {
+      "file": "14-mobile-landing",
+      "png": "docs/showcase/14-mobile-landing.png",
+      "pngBytes": 142710,
+      "webp": "/showcase/screens/14-mobile-landing.webp",
+      "webpBytes": 84922,
+      "width": 780,
+      "height": 1688,
+      "docsWidth": 390,
+      "docsHeight": 844
+    },
+    {
+      "file": "15-mobile-distinctive",
+      "png": "docs/showcase/15-mobile-distinctive.png",
+      "pngBytes": 60954,
+      "webp": "/showcase/screens/15-mobile-distinctive.webp",
+      "webpBytes": 61824,
+      "width": 780,
+      "height": 1688,
+      "docsWidth": 390,
+      "docsHeight": 844
+    },
+    {
+      "file": "16-mobile-debate",
+      "png": "docs/showcase/16-mobile-debate.png",
+      "pngBytes": 40561,
+      "webp": "/showcase/screens/16-mobile-debate.webp",
+      "webpBytes": 41542,
+      "width": 780,
+      "height": 1688,
+      "docsWidth": 390,
+      "docsHeight": 844
+    }
+  ]
+}

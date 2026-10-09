@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CirclePlay } from "lucide-react";
 import Link from "next/link";
 
 import { MonthlyColumns } from "@/components/charts/monthly-columns";
@@ -49,14 +49,20 @@ export default function HomePage() {
                 Open the explorer <ArrowRight className="size-4" aria-hidden />
               </Link>
               <Link
-                href="/method"
+                href="/tour"
+                className="inline-flex h-11 items-center gap-2 rounded-md border border-border px-5 text-sm font-medium hover:bg-accent"
+              >
+                <CirclePlay className="size-4" aria-hidden /> Take the tour
+              </Link>
+              <Link
+                href="/methods"
                 className="inline-flex h-11 items-center rounded-md border border-border px-5 text-sm font-medium hover:bg-accent"
               >
                 How it was built
               </Link>
             </div>
           </div>
-          <dl className="grid grid-cols-2 content-start gap-x-6 gap-y-7 border-t border-rule/60 pt-6 lg:border-t-0 lg:border-l lg:pt-1 lg:pl-8">
+          <div className="grid grid-cols-2 content-start gap-x-6 gap-y-7 border-t border-rule/60 pt-6 lg:border-t-0 lg:border-l lg:pt-1 lg:pl-8">
             <StatTile
               label="Campaign documents"
               value={formatInt(o.documents)}
@@ -77,7 +83,7 @@ export default function HomePage() {
               value={formatInt(o.debateTurns)}
               note={`${formatCompact(o.debateWords)} words, 1960 to 2024`}
             />
-          </dl>
+          </div>
         </div>
       </section>
 
@@ -103,8 +109,8 @@ export default function HomePage() {
         </Panel>
       </div>
 
-      <Section id="tools" kicker="Four ways in" title="Choose a question" className="mt-20">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Section id="tools" kicker="Six ways in" title="Choose a question" className="mt-20">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <ToolCard href="/explorer" index="01 · Explorer" title="Who published what, when">
             Filter documents by candidate, type, year and title. See the monthly rhythm and open any
             document on the archive.
@@ -124,6 +130,14 @@ export default function HomePage() {
           <ToolCard href="/timeline" index="04 · Term timeline" title="When a topic rose and fell">
             Mentions per 10,000 words over time, with exact confidence intervals and short quoted
             passages.
+          </ToolCard>
+          <ToolCard href="/readability" index="05 · Readability" title="What a reading grade hides">
+            Reading-grade trends with bootstrap intervals, and how much of a grade is decided by
+            whoever transcribed the speech.
+          </ToolCard>
+          <ToolCard href="/topics" index="06 · Topic labels" title="Can an LLM code policy topics?">
+            A language model against transparent keyword rules on a small labelled set, with
+            Cohen&apos;s kappa and intervals. Bring your own key; every call is logged.
           </ToolCard>
         </div>
       </Section>
@@ -178,7 +192,7 @@ export default function HomePage() {
         title="Descriptive by design"
         className="mt-20"
       >
-        <div className="grid gap-8 text-sm leading-relaxed text-muted-foreground md:grid-cols-3">
+        <div className="grid gap-8 text-sm leading-relaxed text-muted-foreground sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <p className="font-medium text-foreground">Symmetric</p>
             <p className="mt-1">
@@ -198,6 +212,30 @@ export default function HomePage() {
             <p className="mt-1">
               The database holds counts and metadata. Quotations are capped at 25 words and link to
               the archive page they come from.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium text-foreground">Uncertainty on show</p>
+            <p className="mt-1">
+              Rates, grades and agreement scores come with 95% intervals, sample sizes and the seed
+              that reproduces them, and word lists come with a stability check.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium text-foreground">AI is optional and logged</p>
+            <p className="mt-1">
+              The one AI feature runs only with your own key, sends only short excerpts, labels its
+              output and records every call in an audit log in your browser.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium text-foreground">Decisions written down</p>
+            <p className="mt-1">
+              Each design choice has a{" "}
+              <Link href="/methods#decisions" className="inline-link">
+                decision record
+              </Link>
+              : what was decided, the options, what happened and what I would change.
             </p>
           </div>
         </div>

@@ -14,6 +14,75 @@ A descriptive reading room for US campaign documents (2016 to 2024) and 179 deba
 
 ---
 
+## Showcase
+
+![Compare two speakers: a captioned walkthrough of Distinctive words, choosing Hillary Clinton and Bernie Sanders in 2016 and following a word back to its source documents](docs/showcase/compare-two-speakers.gif)
+
+Three scripted walkthroughs and screenshots of every tool. The
+**[guided tour](https://campaign-text-lab.vercel.app/tour)** on the site plays the walkthroughs as
+captioned videos with step-by-step transcripts. Everything here is produced by one Playwright
+script (`web/e2e/showcase.spec.ts`, run with `pnpm showcase`), which also checks each step as an
+end-to-end test.
+
+|                                                                                                                                                                                                                                                                                          |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Landing, paper theme: Headline figures from the original collection and the six tools.](docs/showcase/01-landing-light.png)<br>**Landing, paper theme.** Headline figures from the original collection and the six tools.                                                              | ![Landing, microfilm theme: The same page in the dark theme.](docs/showcase/02-landing-dark.png)<br>**Landing, microfilm theme.** The same page in the dark theme.                                                                                                                                                                                                                                                                                                                                          |
+| ![Explorer: 7,556 documents by candidate, type and month, each linked to its source.](docs/showcase/03-explorer.png)<br>**Explorer.** 7,556 documents by candidate, type and month, each linked to its source.                                                                           | ![Distinctive words: Clinton and Sanders in 2016: Fightin' Words z-scores, word by word.](docs/showcase/04-distinctive-words.png)<br>**Distinctive words.** Clinton and Sanders in 2016: Fightin' Words z-scores, word by word.                                                                                                                                                                                                                                                                             |
+| ![Word-list stability: How often each top word survives 200 document resamples.](docs/showcase/05-word-stability.png)<br>**Word-list stability.** How often each top word survives 200 document resamples.                                                                               | ![Debates, 1960 to 2024: One dot per debate: moderator share, turn length, turn rate and reading grade.](docs/showcase/06-debates.png)<br>**Debates, 1960 to 2024.** One dot per debate: moderator share, turn length, turn rate and reading grade.                                                                                                                                                                                                                                                         |
+| ![One debate, turn by turn: Kennedy and Nixon, Chicago 1960: every turn, share of words and turn lengths.](docs/showcase/07-debate-turns.png)<br>**One debate, turn by turn.** Kennedy and Nixon, Chicago 1960: every turn, share of words and turn lengths.                             | ![Term timeline: Economy mentions per 10,000 words by quarter, with exact Poisson 95% intervals.](docs/showcase/08-term-timeline.png)<br>**Term timeline.** Economy mentions per 10,000 words by quarter, with exact Poisson 95% intervals.                                                                                                                                                                                                                                                                 |
+| ![Readability: Reading-grade trends with cluster-bootstrap intervals.](docs/showcase/09-readability.png)<br>**Readability.** Reading-grade trends with cluster-bootstrap intervals.                                                                                                      | ![Bring your own key: AI settings: the visitor's own key, kept in the browser and sent only to the provider.](docs/showcase/10-byok-settings.png)<br>**Bring your own key.** AI settings: the visitor's own key, kept in the browser and sent only to the provider.                                                                                                                                                                                                                                         |
+| ![LLM against keyword rules: Paired scores with intervals on the same excerpts (mocked AI response for illustration).](docs/showcase/11-topic-evaluation.png)<br>**LLM against keyword rules.** Paired scores with intervals on the same excerpts (mocked AI response for illustration). | ![AI audit log: Every call with prompt, answer, latency, tokens and the human decision.](docs/showcase/12-ai-audit-log.png)<br>**AI audit log.** Every call with prompt, answer, latency, tokens and the human decision.                                                                                                                                                                                                                                                                                    |
+| ![Methods: Provenance, statistics, the AI use statement, model card and decision records.](docs/showcase/13-methods.png)<br>**Methods.** Provenance, statistics, the AI use statement, model card and decision records.                                                                  | <img src="docs/showcase/14-mobile-landing.png" width="128" alt="Phone: landing: The landing page at 390 px."> <img src="docs/showcase/15-mobile-distinctive.png" width="128" alt="Phone: distinctive words: Word lists stack on a phone."> <img src="docs/showcase/16-mobile-debate.png" width="128" alt="Phone: a debate, dark theme: Share of words and turn lengths for the 2024 Philadelphia debate."><br>**On a phone (390 px).** The landing page, distinctive words, and a debate in the dark theme. |
+
+### Workflow walkthrough
+
+Each numbered step is a caption in the recording, in order.
+
+1. **Compare two speakers** ([video](https://campaign-text-lab.vercel.app/tour#compare-two-speakers), [try it](https://campaign-text-lab.vercel.app/distinctive)). Pick two candidates and see the words that most set them apart, with z-scores, a stability check and links back to the source documents.
+
+   1. Distinctive words compares the vocabulary of any two groups of campaign documents.
+   2. Group A: choose a candidate, Hillary Clinton, and the 2016 cycle.
+   3. Group B: Bernie Sanders, in the same cycle.
+   4. Each side's document count and indexed words, and how many words pass |z| = 1.96.
+   5. Every word gets a Fightin' Words z-score; the funnel plot shows all of them at once.
+   6. The ranked lists: a z-score bar and uses per 10,000 words in each group.
+   7. Select a word to see the documents in each group that use it most.
+   8. Every example links back to the full text on The American Presidency Project.
+   9. Resampling documents 200 times shows how stable each top word is.
+
+2. **Sixty years of debates** ([video](https://campaign-text-lab.vercel.app/tour#sixty-years-of-debates), [try it](https://campaign-text-lab.vercel.app/debates)). Talk share and turn length by participant, from Kennedy and Nixon in 1960 to Harris and Trump in 2024.
+
+   ![Sixty years of debates: captioned walkthrough](docs/showcase/sixty-years-of-debates.gif)
+
+   1. 179 debate transcripts from 1960 to 2024, split into 44,255 speaking turns.
+   2. One dot per debate: the share of words spoken by moderators and panellists.
+   3. Switch the measure to words per candidate turn: turns have shortened since the 1960s.
+   4. Select a dot to open a debate: Kennedy and Nixon in Chicago, 26 September 1960.
+   5. The debate turn by turn: each block is one turn, as wide as it is long.
+   6. Share of words, a stand-in for talk time, and the length of every turn by speaker.
+   7. Back to the overview to jump 64 years ahead.
+   8. Harris and Trump in Philadelphia, 10 September 2024.
+   9. Four times as many candidate turns, averaging 123 words where 1960 averaged 328.
+
+3. **Classical vs LLM topic labels** ([video](https://campaign-text-lab.vercel.app/tour#classical-vs-llm-topic-labels), [try it](https://campaign-text-lab.vercel.app/topics)). A transparent keyword dictionary against a language model on the same gold-labelled excerpts, with intervals, a paired test, human review and an audit log.
+
+   ![Classical vs LLM topic labels: captioned walkthrough](docs/showcase/classical-vs-llm-topic-labels.gif)
+
+   > **Mocked AI response for illustration.** The model output in this walkthrough is a mocked response for illustration: the recording intercepts the request in the browser, so no API key is used and no provider is called. Its scores say nothing about any model.
+   1. Topic labels: a keyword dictionary and a language model label the same gold-labelled excerpts.
+   2. The keyword baseline runs for everyone: agreement and Cohen's kappa with 95% intervals.
+   3. The model is optional and runs on the visitor's own key. Open AI settings.
+   4. Paste a key (here a placeholder, not a real key). It stays in this browser tab.
+   5. Save. Requests go straight from the browser to the provider, never to this site.
+   6. A seeded sample of 40 excerpts, sent in four requests. Mocked AI response for illustration.
+   7. Both labellers scored on the same excerpts: intervals, paired difference and McNemar's test.
+   8. Every label is marked AI-generated. Correct one, then accept the run.
+   9. Every call is in the AI audit log with prompt, answer, latency, tokens and decision.
+
+The GIFs are 960 px wide at 10 frames per second; the MP4 versions on the tour page are sharper.
+Raw recordings stay out of the repository: `pnpm showcase` writes them to `web/.showcase/` and
+`pnpm showcase:media` converts them with ffmpeg, cutting page-load pauses.
+
 ## Overview
 
 In August 2025 I wrote two Jupyter notebooks that collect public pages from The American
@@ -22,18 +91,64 @@ transcript it holds. They wrote four CSV files. In 2026 the project was revived 
 reads those CSVs, without scraping anything again, and turns them into a small set of descriptive
 tools.
 
-| Tool                  | What it shows                                                                                                                                                                      |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Explorer**          | 7,556 documents filtered by candidate, document type, year and title; documents per month; links to every source page.                                                             |
-| **Distinctive words** | Monroe, Colaresi and Quinn's (2008) weighted log-odds with an informative Dirichlet prior between any two candidates or election cycles, with a funnel plot and example documents. |
-| **Debates**           | 179 transcripts split into 44,255 speaking turns: talk share, turn lengths, moderator share and reading grade from 1960 to 2024, and a turn-by-turn view of each debate.           |
-| **Term timeline**     | Mentions per 10,000 words for 44 policy topics or any indexed word, with exact Poisson 95% intervals and short quoted passages.                                                    |
-| **Method**            | The scraper design, the parity checks, and live playgrounds for the ported date normaliser, transcript splitter and readability code.                                              |
+| Tool                  | What it shows                                                                                                                                                                                                                                       |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Explorer**          | 7,556 documents filtered by candidate, document type, year and title; documents per month; links to every source page.                                                                                                                              |
+| **Distinctive words** | Monroe, Colaresi and Quinn's (2008) weighted log-odds with an informative Dirichlet prior between any two candidates or election cycles, with a funnel plot, example documents and a document-level bootstrap check of how stable each top word is. |
+| **Debates**           | 179 transcripts split into 44,255 speaking turns: talk share, turn lengths, moderator share and reading grade from 1960 to 2024, and a turn-by-turn view of each debate.                                                                            |
+| **Term timeline**     | Mentions per 10,000 words for 44 policy topics or any indexed word, with exact Poisson 95% intervals and short quoted passages.                                                                                                                     |
+| **Readability**       | Flesch-Kincaid trends with bootstrap intervals: debates 1960 to 2024, documents by cycle and kind of text, a paired within-speaker comparison, and two debates held in two transcripts.                                                             |
+| **Topic labels**      | An LLM against a frozen keyword dictionary on 120 labelled excerpts: agreement, Cohen's kappa, paired differences and McNemar's test. Bring your own key; a simulated run works without one.                                                        |
+| **AI audit log**      | Every AI call from your browser, with prompt, answer, latency, tokens and your decision, exportable as JSON or CSV. Kept in your browser only.                                                                                                      |
+| **Methods**           | The scraper design, parity checks, playgrounds, every statistic and interval, assumptions and limits, the AI use statement, the model card and the decision records.                                                                                |
 
 Key results carried over from the original collection: 7,582 listing rows (7,556 unique
 documents, 2016-01-01 to 2024-11-06, all extracted successfully) under 54 speakers, and 179 debate
 transcripts from Kennedy and Nixon in Chicago (26 September 1960) to the 2024 vice-presidential
 debate.
+
+### What the 2026 upgrade added
+
+The revival turned the CSVs into a reading room; the October 2026 upgrade adds the statistical
+checks and the evaluation that a careful analyst would want next.
+
+- **Uncertainty everywhere it matters.** Rates carry exact Poisson intervals. Reading grades
+  carry cluster-bootstrap intervals that resample whole speakers or whole election cycles,
+  because a campaign's documents and a cycle's debates are not independent, and the 14-speaker
+  paired gap carries a t interval. Agreement scores carry Wilson intervals and kappa a bootstrap
+  interval. Sample sizes, cluster counts, resample counts and the seed (20261010) are shown next
+  to the numbers.
+- **Word lists that admit their fragility.** Fightin' Words z-scores assume independent word
+  tokens. Each comparison is re-run on 200 resamples of documents, and each top word shows how
+  often it stays in the list, its z range, how many documents use it and how much of it comes
+  from one document. In the default comparison, 21 of 30 words for 2016 and 19 of 30 for 2024
+  stay in the top 30 in at least 90% of resamples; "county" (third for 2016) gets 30% of its
+  uses from a single document.
+- **Readability with the transcriber in view.** Candidates' grade in general-election and VP
+  debates falls by 0.75 grade levels per decade (95% CI 0.55 to 1.02, 49 debates in 14 cycles,
+  cycles resampled), but the same speakers' transcribed remarks grade 5.5 levels below their
+  written releases (95% t interval 4.1 to 6.9, 14 speakers, paired; all 14 lower), mostly
+  through sentence length, and two transcripts of the same 2000 debate differ by up to 1.4
+  levels for one speaker who has the same words in both. Document cells from fewer than ten
+  speakers show a mean and no interval, because a cluster bootstrap runs narrow below that.
+- **An honest LLM evaluation.** A CAP-style codebook of 21 policy topics plus "none", a keyword
+  dictionary frozen before the gold set was drawn, and a seeded, keyword-blind gold set of 120
+  one-sentence excerpts. The keyword rules agree with the gold labels on 75.8% of excerpts (95%
+  CI 67.4% to 82.6%), Cohen's kappa 0.59 (0.45 to 0.71). The gold labels are a single-annotator
+  draft prepared by the AI coding assistant that built the upgrade, which also wrote the keyword
+  dictionary, so they are independent of neither labeller and no person has labelled them yet.
+  Their provenance is recorded as fields and a note worded from those fields sits above every
+  score; the plan to replace them is a blind relabel by two people (DR-007). A request that
+  fails or is stopped is left out of the scores for both labellers, never counted against the
+  model.
+- **Statistics checked against Python.** `scripts/stats_reference.py` recomputes the Wilson
+  intervals (statsmodels), kappa and per-class metrics (scikit-learn), McNemar's test
+  (statsmodels), OLS, t quantiles and the sign test (SciPy), the row and cluster bootstraps
+  (numpy with a port of the same seeded generator), the word-list stability (an independent
+  Python port) and every readability summary (from the database). The Vitest suite compares the
+  TypeScript to these values.
+- **Written decisions.** Decision records DR-001 to DR-008 and a model card, rendered under
+  `/methods`; a record that a later one amends carries an "Amended by" notice.
 
 ### Ground rules
 
@@ -42,16 +157,73 @@ through the same code, colours identify the groups being compared and never part
 scored for sentiment or quality, and nothing is predicted. Default views compare election cycles
 rather than people.
 
+## Bring your own key: the optional AI feature
+
+The site works fully without AI. The one AI feature, on `/topics`, asks a language model to
+label the policy topic of short excerpts so it can be compared with the keyword rules.
+
+1. Open **AI settings** (the key icon in the header). Choose Anthropic (default, with Claude
+   Haiku 4.5 or Claude Sonnet 5.5) or OpenAI (any Chat Completions model with JSON-schema
+   output; `gpt-5-mini` by default) and paste your own API key. A key with a low spending limit
+   is a good idea.
+2. The key stays in your browser: sessionStorage by default (gone when the tab closes), or
+   localStorage if you tick "remember on this device". **Forget key** removes it. It is never
+   sent to this site's server, never logged and never written to the audit log.
+3. On `/topics`, pick a sample size and a seed and select **Run with my key**. Requests go
+   straight from your browser to `api.anthropic.com` (with the
+   `anthropic-dangerous-direct-browser-access` header) or `api.openai.com`. Each request
+   carries only the codebook, the coding rules and up to ten excerpts of 25 words or fewer with
+   opaque ids: no speaker, date, link or gold label as metadata, although 35 of the 120 excerpts
+   name the candidate in the text. The page estimates tokens and cost first.
+4. Without a key, **Run the simulated demo** exercises the same harness, scoring, audit log and
+   exports with a simulated labeller that calls nothing; its output is labelled "Simulated, not
+   AI".
+
+Every model output is labelled "AI-generated", and every exported row says who labelled it
+(`AI-generated: provider/model`, or `simulated (no model called)`), with the run id and seed.
+You can accept, correct or reject each run, and accept or reject any single call later from
+the log; corrections are logged as edits and never change the scores. A run with your key is
+offered only when the browser can keep the audit log. If a request fails (key, network,
+rate limit, server error) or you press Stop, its excerpts are left out of the scores for both
+labellers and the run is marked incomplete; failed calls stay in the log, with nothing to accept.
+
+### Viewing the AI audit log
+
+Open `/ai-log` (also linked from the footer and the AI settings dialog). Each call, failed call
+and simulated run appears with its timestamp, provider, requested and served model, the exact
+system prompt and user message, the validated answer (or the raw text when it failed), latency,
+token usage, retries, the generation settings sent (token ceiling, temperature or effort), a
+hash of the output schema, your decision and the history of every decision you made on it.
+Calls still awaiting review can be accepted or rejected there, with a note. **Export JSON** and
+**Export CSV** download the log;
+**Clear log** deletes it. The log lives in your browser's IndexedDB (database
+`campaign-text-lab`, store `ai_audit_log`); this site has no database to send it to.
+
+## Methods, model card and decision records
+
+- `/methods` describes data provenance, every calculation and interval, the topic evaluation
+  design, assumptions and limitations, the AI use statement and what I would change.
+- [`docs/model-card.md`](docs/model-card.md) covers the two topic labellers (rendered at
+  `/methods/model-card`).
+- [`docs/decisions/`](docs/decisions/) holds the decision records, each in the same order:
+  decision first, context, options, why, what happened (weak numbers included) and what I'd
+  change. They are rendered at `/methods/decisions/<slug>`. A past record is never edited; a
+  new one supersedes or amends it, and the older record's page links to it.
+
+Because the deployment uploads `web/` only, the documents are mirrored into `web/content` by
+`pnpm sync:docs`, and a test fails if the copies drift from `docs/`.
+
 ## Tech stack
 
-|             | Original (2025)                                                                        | Revived (2026)                                                                                                         |
-| ----------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Collection  | Python, Jupyter, `requests` with retries, BeautifulSoup4, `ThreadPoolExecutor`, `tqdm` | none (the CSVs are read as they are)                                                                                   |
-| Data        | CSV files                                                                              | A 9 MB read-only SQLite file built by Python scripts run with `uv`                                                     |
-| App         | none                                                                                   | Next.js 16 (App Router, Cache Components), React 19, TypeScript (strict), Tailwind CSS 4, shadcn config, `next-themes` |
-| Server data | none                                                                                   | Node's built-in `node:sqlite`, queried from Server Components                                                          |
-| Charts      | none                                                                                   | Hand-rolled SVG with a validated neutral palette                                                                       |
-| Tests       | none                                                                                   | Vitest parity suites against the original CSVs; GitHub Actions CI                                                      |
+|               | Original (2025)                                                                        | Revived (2026)                                                                                                                         |
+| ------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Collection    | Python, Jupyter, `requests` with retries, BeautifulSoup4, `ThreadPoolExecutor`, `tqdm` | none (the CSVs are read as they are)                                                                                                   |
+| Data          | CSV files                                                                              | A 9 MB read-only SQLite file built by Python scripts run with `uv`                                                                     |
+| App           | none                                                                                   | Next.js 16 (App Router, Cache Components), React 19, TypeScript (strict), Tailwind CSS 4, shadcn config, `next-themes`                 |
+| Server data   | none                                                                                   | Node's built-in `node:sqlite`, queried from Server Components                                                                          |
+| Charts        | none                                                                                   | Hand-rolled SVG with a validated neutral palette                                                                                       |
+| AI (optional) | none                                                                                   | Browser-direct Anthropic or OpenAI calls with the visitor's key, zod-validated JSON, IndexedDB audit log                               |
+| Tests         | none                                                                                   | Vitest parity suites against the original CSVs and reference values from numpy, SciPy, statsmodels and scikit-learn; GitHub Actions CI |
 
 ## Repository structure
 
@@ -71,24 +243,41 @@ rather than people.
 │   ├── pyproject.toml           black/isort settings
 │   ├── README-2025.md           the README before the revival
 │   └── _archive/                the first README
+├── docs/
+│   ├── model-card.md            the two topic labellers
+│   ├── decisions/               DR-001 to DR-008 and an index
+│   └── showcase/                README screenshots and walkthrough GIFs (pnpm showcase)
 ├── scripts/                     reproducible data build (uv, PEP 723 inline dependencies)
 │   ├── parity_check.py          runs the notebook code offline against the stored HTML/CSV
 │   ├── build_analytics.py       writes web/data/analytics.db and the test fixtures
+│   ├── build_topic_eval.py      draws the 120 seeded excerpts for the topic evaluation
+│   ├── stats_reference.py       reference values from numpy, SciPy, statsmodels, scikit-learn
+│   ├── score_relabel.py         scores a blind relabel of the topic gold set (DR-007)
 │   ├── date_fixtures.py         CPython 3.11 date results for the TypeScript differential test
 │   ├── textkit.py               tokeniser, document cleaning, readability, topic list
 │   └── debatekit.py             debate turn segmentation and roles
 └── web/                         the Next.js app (Vercel root directory)
     ├── data/analytics.db        derived, read-only database (no running text)
+    ├── content/                 copies of docs/ for rendering (pnpm sync:docs)
+    ├── e2e/                     the showcase tour: Playwright screenshots and recorded walkthroughs
+    ├── public/showcase/         walkthrough MP4s, posters, WebVTT captions and screenshots for /tour
+    ├── scripts/                 docs sync; showcase-media.mjs turns recordings into MP4, GIF and WebP
     └── src/
-        ├── app/                 routes: /, /explorer, /distinctive, /debates, /debates/[slug], /timeline, /method
-        ├── components/          ui/ primitives, layout/, charts/, and one folder per tool
-        ├── data/                generated JSON (parity summary, debate candidate list)
+        ├── app/                 routes: /, /explorer, /distinctive, /debates, /debates/[slug], /timeline,
+        │                        /readability, /topics, /ai-log, /methods (+ /decisions/[slug], /model-card),
+        │                        /tour
+        ├── components/          ui/ primitives, layout/, charts/, ai/, and one folder per tool
+        ├── data/                generated JSON (parity summary, candidate list, topic items and gold labels)
         ├── hooks/               element width, URL-driven filters
         ├── lib/                 framework-free logic and its tests
+        │   ├── ai/              provider adapters, settings store, audit log, topic-label client
         │   ├── original/        TypeScript ports of the notebook code (dates, documents, splitter)
-        │   ├── stats/           Fightin' Words and exact Poisson intervals
+        │   ├── stats/           Fightin' Words, Poisson, row and cluster bootstrap, t, sign test, Wilson,
+        │   │                    kappa, McNemar, OLS, stability
+        │   ├── topics/          codebook, keyword rules, gold set, scoring, simulated labeller
+        │   ├── readability-stats.ts  grade by cycle, paired gap, debate trends
         │   └── textkit.ts       twin of scripts/textkit.py
-        └── server/              server-only data access (node:sqlite)
+        └── server/              server-only data access (node:sqlite) and the markdown docs
 ```
 
 ## Local development
@@ -111,6 +300,18 @@ pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build
 `pnpm typecheck` runs `next typegen && tsc --noEmit`, because Next 16's global route types
 (`PageProps`, `LayoutProps`) only exist after type generation.
 
+Showcase media (the screenshots, GIFs and the videos on `/tour`):
+
+```bash
+pnpm showcase                                   # against production
+BASE_URL=http://localhost:3536 pnpm showcase    # against a local `pnpm build && pnpm start`
+```
+
+It drives the installed Google Chrome (Playwright channel `chrome`; Playwright's own browsers are
+never downloaded), asserts each step as an end-to-end test, and needs `ffmpeg` and `cwebp` for
+the conversion step. The AI walkthrough never uses a real key: it types a placeholder and answers
+the provider request inside the browser with a mocked response that is labelled on screen.
+
 Deploying: the production site at <https://campaign-text-lab.vercel.app> is the Vercel project
 `campaign-text-lab`, deployed from inside `web/` (`vercel deploy --prod`). It needs no environment
 variables: there are no accounts, sessions or secrets.
@@ -124,7 +325,31 @@ root:
 uv run scripts/parity_check.py     # ~15 s: the notebooks' own code, offline, against the CSVs
 uv run scripts/build_analytics.py  # ~1-4 min: writes web/data/analytics.db and fixtures
 uv run scripts/date_fixtures.py    # ~10 s, Python 3.11 on macOS: date differential fixtures
+uv run scripts/build_topic_eval.py # ~15 s: the 120 topic-evaluation excerpts (seed 20261010)
+uv run scripts/stats_reference.py  # ~15 s: reference values for the statistics tests
 ```
+
+`build_topic_eval.py` rewrites only `web/src/data/topic-eval-items.json`; the gold labels in
+`web/src/data/topic-gold.json` are edited directly in that file and never touched by a script.
+The current labels are a draft prepared by the AI coding assistant that built the upgrade, which
+also wrote the keyword dictionary, so they are independent of neither labeller. Do not review
+them in place: a draft anchors its reviewer. Replace them with a blind relabel instead
+([DR-007](docs/decisions/DR-007-blind-relabel-for-the-gold-set.md)):
+
+1. Two people, at least one of whom has not seen `web/src/lib/topics/keyword-rules.ts`, each
+   download the coding sheet from `/topics/blind-relabel.csv` (ids and excerpts only) and fill
+   in the `topic` column from the codebook and coding rules, without seeing the draft or each
+   other's sheet.
+2. `uv run scripts/score_relabel.py coder-a.csv coder-b.csv` reports agreement (Wilson
+   interval), Cohen's kappa (bootstrap interval) and Krippendorff's alpha between the coders and
+   for each coder against the draft, and lists the disagreements to resolve.
+3. Commit the resolved labels as `version: 2` with the `provenance` fields filled in: `method`
+   set to `blind-relabel`, then `coders`, `human_coders`, `blind_to_keyword_rules`,
+   `intercoder_kappa` and `kappa_vs_ai_draft`. The note on `/topics` and `/methods` is worded
+   from those fields.
+4. Run the tests: the model card's baseline numbers are checked against the computed scores, so
+   update `docs/model-card.md`, write a new decision record with the outcome, and run
+   `pnpm sync:docs`.
 
 `build_analytics.py` de-duplicates the 26 repeated listing rows, keeps only text in each
 candidate's own voice (interviewer, moderator and audience turns inside transcripts are dropped),
@@ -167,9 +392,10 @@ Tables: `speakers`, `documents` (metadata and statistics, no text), `terms` (com
 `concepts`, `concept_hits`, `concept_snippets` (quotations of 25 words or fewer), `debates`,
 `debate_speakers` and `debate_turns`.
 
-Because visitors never write anything, there is no hosted database (such as Turso) and no admin
-"records" area: the live site reads exactly this file, so opening it locally shows every record the
-site uses.
+Because visitors never write anything to the server, there is no hosted database (such as Turso)
+and no admin "records" area: the live site reads exactly this file, so opening it locally shows
+every record the site uses. The one thing a visitor can create, the AI audit log, stays in their
+own browser (see [Viewing the AI audit log](#viewing-the-ai-audit-log)).
 
 ### Parity with the original code
 
@@ -201,3 +427,8 @@ Personal project by Sunchuangyu (Rin) Huang ([@rNLKJA](https://github.com/rNLKJA
 August 2025 and revived in 2026. Data courtesy of The American Presidency Project. Method:
 Monroe, B. L., Colaresi, M. P. and Quinn, K. M. (2008), "Fightin' Words: Lexical Feature Selection
 and Evaluation for Identifying the Content of Political Conflict", _Political Analysis_ 16(4).
+The topic codebook is modelled on the major topics of the Comparative Agendas Project
+(comparativeagendas.net); it is an adaptation, not the official codebook. The AI feature is
+informed by the Australian Government's policy for the responsible use of AI in government, the
+EU AI Act's transparency principles and the NIST AI Risk Management Framework, without claiming
+compliance with any of them.

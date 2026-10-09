@@ -61,6 +61,7 @@ export function Callout({
 }) {
   return (
     <aside
+      aria-label={title}
       className={cn(
         "flex gap-3 rounded-lg border border-border bg-secondary/50 px-4 py-3 text-sm leading-relaxed",
         className,
@@ -101,7 +102,13 @@ export function TableView({
       <summary className="cursor-pointer text-muted-foreground select-none hover:text-foreground">
         {summary}
       </summary>
-      <div className="mt-3 max-h-80 overflow-auto rounded-md border border-border">
+      {/* focusable so keyboard users can scroll it */}
+      <div
+        className="mt-3 max-h-80 overflow-auto rounded-md border border-border"
+        role="region"
+        aria-label={caption}
+        tabIndex={0}
+      >
         <table className="w-full border-collapse text-left text-xs">
           <caption className="sr-only">{caption}</caption>
           <thead className="sticky top-0 bg-secondary">

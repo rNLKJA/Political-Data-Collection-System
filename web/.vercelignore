@@ -1,0 +1,5 @@
+# The showcase tour's raw recordings and Playwright output are local working files:
+# they are not needed to build or serve the site.
+.showcase/
+test-results/
+playwright-report/

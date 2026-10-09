@@ -364,8 +364,8 @@ async function TimelineResults({
         about 3.7 per 10k. Topic lists are matched as whole words or phrases, ignoring case except
         for the two party names, which count only when capitalised; they count mentions, not
         stances. See{" "}
-        <Link href="/method#timeline" className="inline-link">
-          Method
+        <Link href="/methods#timeline" className="inline-link">
+          Methods
         </Link>
         .
       </Callout>
