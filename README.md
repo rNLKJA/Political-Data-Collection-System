@@ -2,8 +2,8 @@
 
 # Campaign Text Lab
 
-A descriptive reading room for US campaign documents (2016 to 2024) and presidential and
-vice-presidential debate transcripts (1960 to 2024), built on a personal scraper of
+A descriptive reading room for US campaign documents (2016 to 2024) and 179 debate transcripts
+(49 general-election and vice-presidential, 130 primary; 1960 to 2024), built on a personal scraper of
 [The American Presidency Project](https://www.presidency.ucsb.edu) at UC Santa Barbara.
 
 **Live demo:** coming soon (Vercel project `campaign-text-lab`)
@@ -26,7 +26,7 @@ tools.
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Explorer**          | 7,556 documents filtered by candidate, document type, year and title; documents per month; links to every source page.                                                             |
 | **Distinctive words** | Monroe, Colaresi and Quinn's (2008) weighted log-odds with an informative Dirichlet prior between any two candidates or election cycles, with a funnel plot and example documents. |
-| **Debates**           | 179 transcripts split into 43,727 speaking turns: talk share, turn lengths, moderator share and reading grade from 1960 to 2024, and a turn-by-turn view of each debate.           |
+| **Debates**           | 179 transcripts split into 43,662 speaking turns: talk share, turn lengths, moderator share and reading grade from 1960 to 2024, and a turn-by-turn view of each debate.           |
 | **Term timeline**     | Mentions per 10,000 words for 44 policy topics or any indexed word, with exact Poisson 95% intervals and short quoted passages.                                                    |
 | **Method**            | The scraper design, the parity checks, and live playgrounds for the ported date normaliser, transcript splitter and readability code.                                              |
 
@@ -74,6 +74,7 @@ rather than people.
 ├── scripts/                     reproducible data build (uv, PEP 723 inline dependencies)
 │   ├── parity_check.py          runs the notebook code offline against the stored HTML/CSV
 │   ├── build_analytics.py       writes web/data/analytics.db and the test fixtures
+│   ├── date_fixtures.py         CPython 3.11 date results for the TypeScript differential test
 │   ├── textkit.py               tokeniser, document cleaning, readability, topic list
 │   └── debatekit.py             debate turn segmentation and roles
 └── web/                         the Next.js app (Vercel root directory)
@@ -118,6 +119,7 @@ root:
 ```bash
 uv run scripts/parity_check.py     # ~15 s: the notebooks' own code, offline, against the CSVs
 uv run scripts/build_analytics.py  # ~1-4 min: writes web/data/analytics.db and fixtures
+uv run scripts/date_fixtures.py    # ~10 s, Python 3.11 on macOS: date differential fixtures
 ```
 
 `build_analytics.py` de-duplicates the 26 repeated listing rows, keeps only text in each
@@ -126,6 +128,18 @@ and stores per-document metadata and Flesch-Kincaid statistics, a compressed inv
 16,877 words (counts only), counts for a 44-topic controlled vocabulary with quotations of at most
 25 words, and per-turn word counts for the debates. It also writes reference values for the
 TypeScript tests (Fightin' Words z-scores, and Poisson intervals from SciPy).
+
+Two rules keep the derived data neutral:
+
+- **Debate roles.** A speaker counts as a candidate only if they are on the cycle's list of debate
+  participants, belong to the party holding the debate when it is a primary, and are named in the
+  page's Participants block when it has one. Recorded clips played during a debate ("[begin video
+  clip]" ... "[end video clip]", "(from videotape.)", "VIDEO CLIP OF ...") are counted as "Recorded
+  clips", not as anyone's live speech, so a president quoted in a clip at the other party's primary
+  is not listed as taking part. The build asserts both rules for every debate.
+- **Quotations.** Topic snippets illustrate how a topic is discussed. A quoted window is skipped
+  (the next use, then the next document, is tried) if it names another candidate or uses a charged
+  word such as "liar", "racist" or "Hitler" (`CHARGED_WORDS` in `build_analytics.py`).
 
 ### Parity with the original code
 
@@ -136,6 +150,10 @@ TypeScript tests (Fightin' Words z-scores, and Poisson intervals from SciPy).
   normalisation, document type, location, word count and paragraph join for all 7,582 documents,
   and participants, moderators and plain text for all 179 transcripts, all exact. The revival's
   own tokeniser and readability code are checked document by document against the Python build.
+- `datetime.fromisoformat` is ported in full from CPython 3.11 (basic and week formats, any
+  separator, fractions, offsets). `scripts/date_fixtures.py` runs it and the notebook's two date
+  functions over about 2,400 hand-picked and generated strings, and the TypeScript must return
+  exactly the same for every one.
 
 ## Source, licence and provenance
 
