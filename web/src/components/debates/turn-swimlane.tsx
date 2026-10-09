@@ -155,7 +155,7 @@ export function TurnSwimlane({ speakers, turns }: { speakers: LaneSpeaker[]; tur
           <LegendSwatch color="var(--role-moderator)" /> Moderators, panellists, questioners
         </span>
         <span className="flex items-center gap-1.5">
-          <LegendSwatch color="var(--role-other)" /> Audience, unidentified
+          <LegendSwatch color="var(--role-other)" /> Audience, recorded clips, unidentified
         </span>
       </div>
     </div>

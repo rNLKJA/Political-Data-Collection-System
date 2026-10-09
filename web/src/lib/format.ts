@@ -43,7 +43,7 @@ export function formatPercent(share: number, digits = 1): string {
   return `${(share * 100).toFixed(digits)}%`;
 }
 
-/** 4,534,052 -> "4.5M"; 43,727 -> "43.7K". */
+/** 4,534,052 -> "4.5M"; 43,662 -> "43.7K". */
 export function formatCompact(n: number): string {
   if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
   if (Math.abs(n) >= 1e4) return `${(n / 1e3).toFixed(1)}K`;

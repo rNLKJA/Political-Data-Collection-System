@@ -42,7 +42,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from debatekit import (  # noqa: E402
     CANDIDATES,
+    CLIP_KEY,
     cycle_of,
+    named_in,
+    party_of,
     is_interrupted,
     role_of,
     segment_transcript,
@@ -70,6 +73,22 @@ DEFAULT_ALPHA0 = 10_000.0
 SNIPPET_CONTEXT = 10  # tokens either side of a hit
 SNIPPET_MAX_WORDS = 25
 SNIPPETS_PER_GROUP = 2  # per (concept, speaker, cycle)
+
+# Snippets are shown side by side for different candidates, so they should
+# illustrate how a topic is talked about, not relay attacks. A quoted window is
+# skipped (the next use, then the next document, is tried instead) if it names
+# another candidate or uses one of these charged words. Entries ending in "*"
+# match as prefixes; words that are themselves a topic's search terms (e.g.
+# "criminal" for Crime) are allowed for that topic.
+CHARGED_WORDS = """
+racis* bigot* liar liars lie lies lied lying hitler* nazi* fascis* crook* criminal* corrupt*
+traitor* treason* idiot* stupid* moron* loser* disgrac* pathetic incompeten* dishonest* fraud*
+scam* sleaz* puppet* extremis* unhinged lunatic* derang* coward* clown* crazy senile rigged hoax*
+slander* smear* communis* marxis* socialis* insurrection* dictator* tyrant* thug* demagog* hate
+hatred hateful evil cheat* weak weakness attack*
+""".split()
+# Spouses quoted in support of their partner are not "another candidate".
+SAME_CAMPAIGN = {"EMHOFF": {"HARRIS"}}
 SCHEMA_VERSION = 1
 
 
@@ -111,7 +130,7 @@ SPECIAL_NAMES = {
     "DESANTIS": "DeSantis", "MACCALLUM": "MacCallum", "BLASIO": "de Blasio",
     "VANDEHEI": "VanDeHei", "MCCAIN": "McCain", "THE PRESIDENT": "The President",
     "THE VICE PRESIDENT": "The Vice President", "AUDIENCE": "Audience", "UNKNOWN": "Unidentified",
-    "QUESTIONER": "Questioners", "MODERATOR": "Moderator",
+    "QUESTIONER": "Questioners", "MODERATOR": "Moderator", CLIP_KEY: "Recorded clips",
 }
 
 
@@ -160,9 +179,9 @@ def build_documents(con: sqlite3.Connection) -> dict:
 
     postings: dict[str, list[tuple[int, int]]] = defaultdict(list)
     concept_hits: list[tuple[int, int, int]] = []
-    concept_candidates: dict[tuple[int, int, int], list[tuple[int, str, int, int, str]]] = (
-        defaultdict(list)
-    )
+    concept_candidates: dict[
+        tuple[int, int, int], list[tuple[int, str, int, list[tuple[int, int]]]]
+    ] = defaultdict(list)
     doc_rows = []
     dropped_words = 0
     all_words = 0
@@ -182,10 +201,7 @@ def build_documents(con: sqlite3.Connection) -> dict:
         sid = speaker_id[r.Speaker]
         for ci, hits in match_concepts(words_lower).items():
             concept_hits.append((ci, doc_id, len(hits)))
-            first_i, first_len = hits[0]
-            concept_candidates[(ci, sid, cyc)].append(
-                (len(hits), r.Date, doc_id, first_i, first_len)
-            )
+            concept_candidates[(ci, sid, cyc)].append((len(hits), r.Date, doc_id, hits))
         doc_rows.append(
             dict(
                 id=doc_id,
@@ -211,16 +227,31 @@ def build_documents(con: sqlite3.Connection) -> dict:
             )
         )
 
-    # Snippets: for each (concept, speaker, cycle) keep the documents that use the
-    # concept most often, and quote the first use with a few words either side.
+    # Snippets: for each (concept, speaker, cycle) take the documents that use the
+    # concept most often and quote the first acceptable use (see CHARGED_WORDS)
+    # with a few words either side.
+    names = candidate_surnames(speakers)
     snippets = []
-    for (ci, _sid, _cyc), cands in concept_candidates.items():
-        cands = sorted(cands, key=lambda c: (c[0], c[1]), reverse=True)[:SNIPPETS_PER_GROUP]
-        for _n, _date, doc_id, ti, tl in cands:
+    skipped = Counter()
+    for (ci, sid, _cyc), cands in concept_candidates.items():
+        cands = sorted(cands, key=lambda c: (c[0], c[1]), reverse=True)
+        own = owner_surname(speakers[sid])
+        other_names = names - {own} - SAME_CAMPAIGN.get(own, set())
+        allowed = concept_words(ci)
+        taken = 0
+        for _n, _date, doc_id, hits in cands:
+            if taken == SNIPPETS_PER_GROUP:
+                break
             d = doc_rows[doc_id]
-            snippet = make_snippet(d["_text"], d["_toks"], ti, tl)
-            if snippet:
+            for ti, tl in hits:
+                snippet = make_snippet(d["_text"], d["_toks"], ti, tl)
+                problem = snippet_problem(snippet[0], other_names, allowed)
+                if problem:
+                    skipped[problem] += 1
+                    continue
                 snippets.append((ci, doc_id, *snippet))
+                taken += 1
+                break
 
     con.executemany(
         "INSERT INTO speakers(id, name, slug, surname, speaker_title) VALUES (?,?,?,?,?)",
@@ -273,11 +304,45 @@ def build_documents(con: sqlite3.Connection) -> dict:
         "raw_tokens": int(all_words),
         "excluded_other_speaker_tokens": int(dropped_words),
         "snippets": len(snippets),
+        "snippet_windows_skipped_names": skipped["name"],
+        "snippet_windows_skipped_charged": skipped["charged"],
         "doc_rows": doc_rows,
         "postings": {t: postings[t] for t in vocab},
         "vocab": vocab,
         "speaker_id": speaker_id,
     }
+
+
+def candidate_surnames(speakers: list[str]) -> set[str]:
+    """Surnames of every candidate in the corpus or the curated debate lists."""
+    out = {owner_surname(s) for s in speakers}
+    for keys in CANDIDATES.values():
+        out |= keys
+    return {n for n in out if n}
+
+
+def concept_words(ci: int) -> set[str]:
+    return {w for pat in CONCEPTS[ci][2] for w in pat.split(" ")}
+
+
+SNIPPET_WORD = re.compile(r"[A-Za-z\u00C0-\u024F]+(?:['\u2019][A-Za-z]+)*")
+
+
+def snippet_problem(snippet: str, other_names: set[str], allowed: set[str]) -> str | None:
+    """"name" if the snippet names another candidate, "charged" for a charged
+    word (see CHARGED_WORDS), otherwise None."""
+    for m in SNIPPET_WORD.finditer(snippet):
+        w = m.group(0).replace("\u2019", "'")
+        w = re.sub(r"'s$", "", w, flags=re.IGNORECASE)
+        if w.upper() in other_names:
+            return "name"
+        lw = w.lower()
+        if lw in allowed:
+            continue
+        for c in CHARGED_WORDS:
+            if (lw.startswith(c[:-1]) if c.endswith("*") else lw == c):
+                return "charged"
+    return None
 
 
 WORDISH = re.compile("[ \\t\\n\\r\\f\\v\\u00a0]+")
@@ -347,6 +412,10 @@ def build_debates(con: sqlite3.Connection) -> dict:
         lst = listing_by_url.loc[r.URL]
         kind, party, fmt = debate_kind(lst["title"])
         turns, stats = segment_transcript(r.Debate_Content_HTML, year)
+        participants = r.Participants if isinstance(r.Participants, str) else None
+
+        def role(key: str) -> str:
+            return role_of(key, year, party, participants)
         speaker_order: dict[str, int] = {}
         per = defaultdict(lambda: {"turns": [], "texts": [], "interrupted": 0})
         for seq, t in enumerate(turns):
@@ -363,14 +432,14 @@ def build_debates(con: sqlite3.Connection) -> dict:
         total_words = sum(sum(v["turns"]) for v in per.values())
         for key, idx in speaker_order.items():
             v = per[key]
-            role = role_of(key, year)
+            role_ = role(key)
             words_ = sum(v["turns"])
-            role_words[role] += words_
-            role_texts[role].extend(v["texts"])
+            role_words[role_] += words_
+            role_texts[role_].extend(v["texts"])
             fk = speaker_readability(v["texts"])
             speaker_rows.append(
                 (
-                    did, idx, key, display_name(key), role, len(v["turns"]), words_,
+                    did, idx, key, display_name(key), role_, len(v["turns"]), words_,
                     words_ / total_words if total_words else 0.0,
                     statistics.fmean(v["turns"]) if v["turns"] else 0.0,
                     float(statistics.median(v["turns"])) if v["turns"] else 0.0,
@@ -379,13 +448,19 @@ def build_debates(con: sqlite3.Connection) -> dict:
             )
         fk_c = speaker_readability(role_texts["candidate"])
         fk_m = speaker_readability(role_texts["moderator"])
-        n_cand = sum(1 for k in speaker_order if role_of(k, year) == "candidate")
+        cands = [k for k in speaker_order if role(k) == "candidate"]
+        n_cand = len(cands)
+        # Every candidate must belong to the primary's party and be named in the
+        # Participants block when the page has one.
+        for k in cands:
+            assert not party or party_of(k, cycle_of(year)) == party, (r.URL, k)
+            assert named_in(k, participants), (r.URL, k)
         debate_rows.append(
             dict(
                 id=did, url=r.URL, date=date, year=year, cycle=cycle_of(year),
                 title=r.Extracted_Title, kind=kind, party=party, format=fmt,
                 related_category=lst["related"] if isinstance(lst["related"], str) else None,
-                participants=r.Participants if isinstance(r.Participants, str) else None,
+                participants=participants,
                 moderators=r.Moderators if isinstance(r.Moderators, str) else None,
                 listing_date=lst["date"], listing_rows=int(lst["rows"]),
                 label_style=stats["label_style"], turns=len(turns), words=total_words,
@@ -399,6 +474,7 @@ def build_debates(con: sqlite3.Connection) -> dict:
         totals["turns"] += len(turns)
         totals["words"] += total_words
         totals["unattributed"] += stats["unattributed_words"]
+        totals["clip_words"] += stats["clip_words"]
 
     con.executemany(
         """INSERT INTO debates(id, url, date, year, cycle, title, kind, party, format,
@@ -426,6 +502,7 @@ def build_debates(con: sqlite3.Connection) -> dict:
         "turns": totals["turns"],
         "words": totals["words"],
         "unattributed_words": totals["unattributed"],
+        "clip_words": totals["clip_words"],
     }
 
 

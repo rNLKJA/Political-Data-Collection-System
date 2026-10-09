@@ -15,8 +15,16 @@ are reduced to a surname key ("Moderator Jim Lehrer" -> LEHRER); "THE
 PRESIDENT" and "THE VICE PRESIDENT" are resolved to the office holder in that
 year. A speaker is a *candidate* if the key is in the curated list of people
 who took part in debates in that election cycle (``CANDIDATES`` below, public
-record); every other named speaker is a moderator, panellist or questioner,
-and audience members or unidentified voices are *other*.
+record), and, in a party primary, belongs to that party, and, where the page
+lists its participants, is named there. Every other named speaker is a
+moderator, panellist or questioner, and audience members or unidentified voices
+are *other*.
+
+Recorded material played during a debate (``[begin video clip]`` ...
+``[end video clip]``, ``(from videotape.)``, labels such as ``VIDEO CLIP OF
+...``) is not live speech: those turns are given the key ``CLIP`` and the role
+*other*, so a candidate who appears only in a clip is not counted as taking
+part.
 """
 
 from __future__ import annotations
@@ -73,6 +81,42 @@ CANDIDATES: dict[int, set[str]] = {
     },
 }
 
+# Democrats among the people above, per cycle; the rest are Republicans except
+# the independents. Used to keep candidates of the other party (quoted in a
+# clip or a question) out of a party's primary debates.
+DEMOCRATS: dict[int, set[str]] = {
+    1960: {"KENNEDY"},
+    1976: {"CARTER", "MONDALE"},
+    1980: {"CARTER"},
+    1984: {"MONDALE", "FERRARO", "HART", "JACKSON"},
+    1988: {"DUKAKIS", "BENTSEN"},
+    1992: {"CLINTON", "GORE"},
+    1996: {"CLINTON", "GORE"},
+    2000: {"GORE", "LIEBERMAN", "BRADLEY"},
+    2004: {"KERRY", "EDWARDS", "DEAN", "CLARK", "LIEBERMAN", "KUCINICH", "SHARPTON"},
+    2008: {"OBAMA", "BIDEN", "CLINTON", "EDWARDS", "RICHARDSON", "DODD", "KUCINICH", "GRAVEL"},
+    2012: {"OBAMA", "BIDEN"},
+    2016: {"CLINTON", "KAINE", "SANDERS", "O'MALLEY", "WEBB", "CHAFEE"},
+    2020: {
+        "BIDEN", "HARRIS", "SANDERS", "WARREN", "BUTTIGIEG", "KLOBUCHAR", "BOOKER", "YANG",
+        "CASTRO", "O'ROURKE", "GABBARD", "STEYER", "BLOOMBERG", "BENNET", "BULLOCK", "BLASIO",
+        "DELANEY", "GILLIBRAND", "HICKENLOOPER", "INSLEE", "RYAN", "SWALWELL", "WILLIAMSON",
+    },
+    2024: {"BIDEN", "HARRIS", "WALZ"},
+}
+INDEPENDENTS: dict[int, set[str]] = {1992: {"PEROT", "STOCKDALE"}}
+
+
+def party_of(key: str, cycle: int) -> str | None:
+    if key not in CANDIDATES.get(cycle, set()):
+        return None
+    if key in DEMOCRATS.get(cycle, set()):
+        return "Democratic"
+    if key in INDEPENDENTS.get(cycle, set()):
+        return "Independent"
+    return "Republican"
+
+
 # Office holders, used to resolve "THE PRESIDENT." / "THE VICE PRESIDENT." labels.
 PRESIDENT = {1976: "FORD", 1980: "CARTER", 1984: "REAGAN", 1992: "BUSH", 1996: "CLINTON",
              2004: "BUSH", 2012: "OBAMA", 2020: "TRUMP", 2024: "BIDEN"}
@@ -113,6 +157,27 @@ PERIOD_RE = re.compile(
     r"|[A-Z][a-z]+ (?!(?:Mr|Mrs|Ms|Dr|Jr|Sr|St)\.)[A-Z][a-z'\-]+)\.\s+(\S[\s\S]*)$"
 )
 INTERRUPT_END_RE = re.compile(r"(?:--|—|–|-)\s*[\"'”]?\s*$")
+
+# Recorded material played during a debate. A clip opens at a "begin" marker and
+# closes at an "end" marker; a few transcripts tag a single turn instead.
+_CLIP_MEDIA = r"(?:video|audio)\s*(?:clip|tape)?|videotape"
+CLIP_MARKER_RE = re.compile(
+    r"[(\[]\s*(?:"
+    rf"(?P<begin>(?:begin|start)\s+(?:{_CLIP_MEDIA})|video\s+clip\s+begins|videotape,[^()\[\]]*)"
+    rf"|(?P<end>(?:end|close)\s+(?:{_CLIP_MEDIA})|video\s+clip\s+ends)"
+    r")\s*[)\]]",
+    re.IGNORECASE,
+)
+CLIP_TURN_RE = re.compile(
+    r"^\s*[(\[]\s*(?:from\s+videotape|pre-?recorded[^()\[\]]*|video\s+clip)\s*\.?\s*[)\]]",
+    re.IGNORECASE,
+)
+CLIP_LABEL_RE = re.compile(r"\b(?:VIDEO|VIDEOTAPE|CLIP|PRE-?RECORDED|RECORDING)\b", re.IGNORECASE)
+# A clip covers at most this many speaker labels. A clip whose "begin" marker is
+# not followed by an "end" marker (before the next "begin" or the end of the
+# transcript) covers only the next label.
+MAX_CLIP_LABELS = 12
+CLIP_KEY = "CLIP"
 
 
 def cycle_of(year: int) -> int:
@@ -238,6 +303,14 @@ def segment_transcript(html: str, year: int) -> tuple[list[Turn], dict]:
     crosstalk = 0
     stage_markers = 0
     unattributed_words = 0
+    clip_words = 0
+    # Pair each clip "begin" marker with the marker that follows it.
+    markers = [
+        m.group("begin") is not None for _, _, full in lines for m in CLIP_MARKER_RE.finditer(full)
+    ]
+    closed = [b and i + 1 < len(markers) and not markers[i + 1] for i, b in enumerate(markers)]
+    marker_i = 0
+    clip_budget = 0  # labels still covered by the open clip
     for tag_label, rest, full in lines:
         label, body = tag_label, rest
         if label is None:
@@ -255,7 +328,10 @@ def segment_transcript(html: str, year: int) -> tuple[list[Turn], dict]:
         crosstalk += len(CROSSTALK_RE.findall(full))
         stage_markers += len(STAGE_RE.findall(full))
         if label is not None:
-            key = speaker_key(label, year)
+            in_clip = clip_budget > 0
+            clip_budget = max(0, clip_budget - 1)
+            clip = in_clip or bool(CLIP_LABEL_RE.search(label) or CLIP_TURN_RE.match(body))
+            key = CLIP_KEY if clip else speaker_key(label, year)
             if current is None or current.key != key:
                 current = Turn(key)
                 turns.append(current)
@@ -265,19 +341,47 @@ def segment_transcript(html: str, year: int) -> tuple[list[Turn], dict]:
             current.texts.append(body)
         else:
             unattributed_words += len(words(strip_stage_directions(body)))
+        if label is not None and current is not None and current.key == CLIP_KEY:
+            clip_words += len(words(strip_stage_directions(body)))
+        for m in CLIP_MARKER_RE.finditer(full):
+            if m.group("begin") is not None:
+                clip_budget = MAX_CLIP_LABELS if closed[marker_i] else 1
+            else:
+                clip_budget = 0
+            marker_i += 1
     stats = {
         "crosstalk": crosstalk,
         "stage_markers": stage_markers,
         "unattributed_words": unattributed_words,
+        "clip_words": clip_words,
         "label_style": "period" if use_period else ("tag" if tag_hits >= colon_hits else "colon"),
     }
     return turns, stats
 
 
-def role_of(key: str, year: int) -> str:
-    if key in ("AUDIENCE", "UNKNOWN"):
+def named_in(key: str, participants: str | None) -> bool:
+    """Is the surname key named in an APP "Participants" field?"""
+    if not participants:
+        return True
+    names = re.sub(r"[^A-Z']+", " ", participants.upper()).split()
+    return key in names
+
+
+def role_of(key: str, year: int, party: str = "", participants: str | None = None) -> str:
+    """Role of a speaker key in a debate held in ``year``.
+
+    ``party`` is the party of a primary debate ("" for general-election and
+    vice-presidential debates) and ``participants`` the page's Participants
+    field, if any.
+    """
+    if key in ("AUDIENCE", "UNKNOWN", CLIP_KEY):
         return "other"
-    if key in CANDIDATES.get(cycle_of(year), set()):
+    cycle = cycle_of(year)
+    if key in CANDIDATES.get(cycle, set()):
+        if party and party_of(key, cycle) != party:
+            return "moderator"
+        if not named_in(key, participants):
+            return "moderator"
         return "candidate"
     return "moderator"
 

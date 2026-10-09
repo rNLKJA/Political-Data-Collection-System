@@ -3,12 +3,6 @@
 export const CYCLES = [2016, 2020, 2024] as const;
 export type Cycle = (typeof CYCLES)[number];
 
-export const CYCLE_LABEL: Record<Cycle, string> = {
-  2016: "2016 cycle (Jan to Dec 2016)",
-  2020: "2020 cycle (2017 to 2020)",
-  2024: "2024 cycle (2021 to Nov 2024)",
-};
-
 export const DOC_TYPES = [
   "Document",
   "Statement",
@@ -66,5 +60,5 @@ export type Role = "candidate" | "moderator" | "other";
 export const ROLE_LABEL: Record<Role, string> = {
   candidate: "Candidates",
   moderator: "Moderators, panellists and questioners",
-  other: "Audience and unidentified",
+  other: "Audience, recorded clips and unidentified",
 };

@@ -27,7 +27,7 @@ export default function OpengraphImage() {
           What US campaigns put on the record, read closely.
         </div>
         <div style={{ display: "flex", marginTop: 28, fontSize: 28, color: "#24395a" }}>
-          7,556 campaign documents · 179 debate transcripts · 43,727 speaking turns
+          7,556 campaign documents · 179 debate transcripts · 43,662 speaking turns
         </div>
       </div>
       <div
