@@ -52,6 +52,13 @@ describe("splitTranscript (handcrafted)", () => {
 
   it("formats lists like Python's str(list)", () => {
     expect(pythonListRepr(["a", "O'Donnell (CBS)"])).toBe(`['a', "O'Donnell (CBS)"]`);
+    // repr() escapes characters that are not printable, and both quotes
+    expect(pythonListRepr(["C\u00a0D", "soft\u00adhyphen", "tab\there", "a'b\"c"])).toBe(
+      String.raw`['C\xa0D', 'soft\xadhyphen', 'tab\there', 'a\'b"c']`,
+    );
+    expect(pythonListRepr(["zero\u200bwidth", "line\u2028sep", "\u{e000}", "back\\slash"])).toBe(
+      String.raw`['zero\u200bwidth', 'line\u2028sep', '\ue000', 'back\\slash']`,
+    );
   });
 });
 

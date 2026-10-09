@@ -112,14 +112,38 @@ export function splitTranscript(contentInnerHtml: string): SplitTranscript {
   return result;
 }
 
-/** Python's `str(list)` for a list of strings, as stored in `Participants_List`. */
+// Characters str.isprintable() rejects: Unicode "Other" and "Separator"
+// categories, except the ordinary space.
+const NON_PRINTABLE = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\p{Zs}]/u;
+
+function escapeNonPrintable(c: string): string {
+  if (c === " " || !NON_PRINTABLE.test(c)) return c;
+  const cp = c.codePointAt(0)!;
+  const hex = cp.toString(16);
+  if (cp < 0x100) return `\\x${hex.padStart(2, "0")}`;
+  if (cp < 0x10000) return `\\u${hex.padStart(4, "0")}`;
+  return `\\U${hex.padStart(8, "0")}`;
+}
+
+/**
+ * Python's `str(list)` for a list of strings, as stored in `Participants_List`:
+ * each item is `repr(item)`, which picks the quote, escapes backslashes, \t \n
+ * \r and any character that is not printable (e.g. a non-breaking space
+ * becomes \xa0).
+ */
 export function pythonListRepr(items: string[]): string {
   const quote = (s: string) => {
     const useDouble = s.includes("'") && !s.includes('"');
     const q = useDouble ? '"' : "'";
-    let body = s.replaceAll("\\", "\\\\");
-    if (!useDouble) body = body.replaceAll("'", "\\'");
-    body = body.replaceAll("\n", "\\n").replaceAll("\r", "\\r").replaceAll("\t", "\\t");
+    let body = "";
+    for (const c of s) {
+      if (c === "\\") body += "\\\\";
+      else if (c === q) body += `\\${q}`;
+      else if (c === "\n") body += "\\n";
+      else if (c === "\r") body += "\\r";
+      else if (c === "\t") body += "\\t";
+      else body += escapeNonPrintable(c);
+    }
     return `${q}${body}${q}`;
   };
   return `[${items.map(quote).join(", ")}]`;

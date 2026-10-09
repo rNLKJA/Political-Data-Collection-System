@@ -6,14 +6,26 @@ import {
   normaliseDebateListingDate,
   normaliseDocumentDate,
   parseListingDate,
+  strftimeLong,
   strptime,
 } from "@/lib/original/dates";
 import { hasOriginal, readCsv } from "@/test/originals";
 
+import differential from "../__fixtures__/dates-differential.json";
+
+type Case = [
+  input: string,
+  iso: number[] | null,
+  isoformat: string | null,
+  strftime: string | null,
+  listing: string | null,
+  document: string,
+];
+
 describe("Python datetime emulation", () => {
   it("parses ISO timestamps with offsets and keeps local fields", () => {
     const dt = fromIsoFormat("2023-11-08T20:00:00+00:00");
-    expect([dt.year, dt.month, dt.day, dt.hour, dt.offsetSeconds]).toEqual([2023, 11, 8, 20, 0]);
+    expect([dt.year, dt.month, dt.day, dt.hour, dt.offsetMicros]).toEqual([2023, 11, 8, 20, 0]);
     expect(isoformat(dt)).toBe("2023-11-08T20:00:00+00:00");
   });
 
@@ -24,6 +36,47 @@ describe("Python datetime emulation", () => {
 
   it("matches month names case-insensitively and accepts unpadded days", () => {
     expect(isoformat(strptime("september 5, 2024", "%B %d, %Y"))).toBe("2024-09-05T00:00:00");
+  });
+});
+
+describe("differential check against CPython 3.11 (scripts/date_fixtures.py)", () => {
+  const cases = differential as unknown as Case[];
+  const fields = (input: string) => {
+    try {
+      const d = fromIsoFormat(input);
+      return [d.year, d.month, d.day, d.hour, d.minute, d.second, d.microsecond, d.offsetMicros];
+    } catch {
+      return null;
+    }
+  };
+
+  it("covers valid and invalid strings", () => {
+    expect(cases.length).toBeGreaterThan(2000);
+    expect(cases.filter((c) => c[1]).length).toBeGreaterThan(500);
+  });
+
+  it("datetime.fromisoformat accepts and rejects exactly the same strings", () => {
+    const bad = cases.filter((c) => JSON.stringify(fields(c[0])) !== JSON.stringify(c[1]));
+    expect(bad.map((c) => [c[0], c[1], fields(c[0])])).toEqual([]);
+  });
+
+  it("isoformat() and strftime('%B %d, %Y') agree", () => {
+    const bad = cases
+      .filter((c) => c[1])
+      .filter((c) => {
+        const d = fromIsoFormat(c[0]);
+        return isoformat(d) !== c[2] || strftimeLong(d) !== c[3];
+      });
+    expect(bad.map((c) => c[0])).toEqual([]);
+  });
+
+  it("the notebook's two date functions agree on every string", () => {
+    const bad = cases.filter(
+      (c) => parseListingDate(c[0]) !== c[4] || normaliseDocumentDate(c[0]) !== c[5],
+    );
+    expect(
+      bad.map((c) => [c[0], c[4], parseListingDate(c[0]), c[5], normaliseDocumentDate(c[0])]),
+    ).toEqual([]);
   });
 });
 

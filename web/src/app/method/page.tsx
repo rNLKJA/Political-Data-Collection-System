@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check, Minus, X } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -91,13 +91,13 @@ export default function MethodPage() {
     {
       what: "Revival analytics → tokens, sentences, syllables, grade per document",
       n: `${formatInt(o.documents)} documents`,
-      py: true,
+      py: null,
       ts: "textkit.test.ts (TypeScript vs the Python build)",
     },
     {
       what: "Fightin' Words z-scores and Poisson intervals",
       n: "reference fixtures",
-      py: true,
+      py: null,
       ts: "stats.test.ts (vs Python and SciPy)",
     },
   ];
@@ -132,6 +132,23 @@ export default function MethodPage() {
         </nav>
 
         <div className="min-w-0 space-y-16">
+          <details className="rounded-lg border border-border bg-card p-4 text-sm lg:hidden">
+            <summary className="cursor-pointer font-medium">On this page</summary>
+            <nav aria-label="On this page (compact)">
+              <ol className="mt-3 space-y-1.5">
+                {TOC.map(([id, label], i) => (
+                  <li key={id}>
+                    <a href={`#${id}`} className="text-muted-foreground hover:text-foreground">
+                      <span className="mr-1.5 font-mono text-[0.7rem]">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          </details>
           <Section
             id="pipeline"
             kicker="01"
@@ -232,10 +249,21 @@ export default function MethodPage() {
                       <td className="px-3 py-2">{r.what}</td>
                       <td className="tabular px-3 py-2 text-muted-foreground">{r.n}</td>
                       <td className="px-3 py-2">
-                        <span className="inline-flex items-center gap-1 text-xs">
-                          <Check className="size-3.5 text-primary" aria-hidden />
-                          {r.py ? "identical" : "differs"}
-                        </span>
+                        {r.py === null ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <Minus className="size-3.5" aria-hidden />
+                            n/a (new in 2026)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs">
+                            {r.py ? (
+                              <Check className="size-3.5 text-primary" aria-hidden />
+                            ) : (
+                              <X className="size-3.5 text-destructive" aria-hidden />
+                            )}
+                            {r.py ? "identical" : "differs"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.ts}</td>
                     </tr>
@@ -247,7 +275,9 @@ export default function MethodPage() {
               “Identical” means every field compared equal as strings: 0 mismatches across{" "}
               {parity.documents.fieldsChecked.length} document fields and{" "}
               {parity.debates.fieldsChecked.length} debate fields. The TypeScript suites assert the
-              same with zero tolerance (floating-point values to 1e-9).
+              same with zero tolerance (floating-point values to 1e-9). The last two rows are code
+              written for the revival, so there is no notebook to compare with; their TypeScript is
+              checked against the revival&apos;s own Python build and SciPy instead.
             </p>
           </Section>
 
@@ -280,7 +310,11 @@ export default function MethodPage() {
                 every text node, stripped and joined with newlines, with runs of three or more
                 newlines collapsed. The TypeScript port does the same over an htmlparser2 tree,
                 including BeautifulSoup&apos;s serialisation (<code>&lt;br/&gt;</code>, minimal
-                escaping) and Python&apos;s definition of whitespace.
+                escaping) and Python&apos;s definition of whitespace. One known gap: malformed HTML
+                (an unclosed or nested <code>&lt;p&gt;</code>) is repaired differently by
+                htmlparser2 than by Python&apos;s <code>html.parser</code>, so a pasted fragment
+                like that can split differently in the playground. All 179 stored transcripts are
+                well formed and match exactly.
               </p>
             </div>
             <Panel className="mt-5">
@@ -395,12 +429,21 @@ rate  = k / N × 10,000      interval scaled the same way`}
               </p>
               <p>
                 A speaker is a <em>candidate</em> if the surname is on the list below of people who
-                took part as candidates in that cycle&apos;s debates (public record). Every other
-                named speaker is grouped as a moderator, panellist or questioner; audience members
-                and unidentified voices form a third group. Word share stands in for talk time.
-                Where a source transcript leaves out a label, the words go to the previous speaker;
-                one such gap in the January 2004 Greenville debate is visible in its moderator
-                share.
+                took part as candidates in that cycle&apos;s debates (public record), belongs to the
+                party holding the debate when it is a primary, and is named in the page&apos;s
+                Participants block when there is one. Every other named speaker is grouped as a
+                moderator, panellist or questioner; audience members, unidentified voices and
+                recorded clips form a third group. Word share stands in for talk time.
+              </p>
+              <p>
+                Recorded material played during a debate is not live speech. Turns between “[begin
+                video clip]” and “[end video clip]” (and the transcripts&apos; other spellings of
+                these markers), turns tagged “(from videotape.)”, and labels such as “VIDEO CLIP OF
+                …” are counted as <em>Recorded clips</em>, so a candidate heard only in a clip, such
+                as a president quoted at the other party&apos;s primary, is not listed as taking
+                part. A clip whose end marker is missing covers only the next speaker. Where a
+                source transcript leaves out a label, the words go to the previous speaker; one such
+                gap in the January 2004 Greenville debate is visible in its moderator share.
               </p>
             </div>
             <details className="mt-4 rounded-lg border border-border bg-card p-4 text-sm">
