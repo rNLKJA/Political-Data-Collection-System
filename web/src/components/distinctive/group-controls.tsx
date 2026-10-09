@@ -3,7 +3,7 @@
 import { ArrowLeftRight, LoaderCircle } from "lucide-react";
 
 import { LegendSwatch } from "@/components/charts/chart-tooltip";
-import { Field, Select } from "@/components/common/field";
+import { Field, Select } from "@/components/ui/field";
 import { useQueryNav, type QueryState } from "@/hooks/use-query-nav";
 
 interface Option {

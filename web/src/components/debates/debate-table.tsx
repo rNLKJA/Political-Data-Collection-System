@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { LegendSwatch } from "@/components/charts/chart-tooltip";
-import { Select } from "@/components/common/field";
+import { Select } from "@/components/ui/field";
 import { formatDate, formatInt, formatPercent } from "@/lib/format";
 
 export interface DebateRow {

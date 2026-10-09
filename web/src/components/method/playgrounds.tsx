@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { controlClass } from "@/components/common/field";
+import { controlClass } from "@/components/ui/field";
 import {
   normaliseDebateListingDate,
   normaliseDocumentDate,

@@ -4,7 +4,7 @@ import { LoaderCircle, Search, X } from "lucide-react";
 import { useState } from "react";
 
 import { LegendSwatch } from "@/components/charts/chart-tooltip";
-import { controlClass, Field, Select } from "@/components/common/field";
+import { controlClass, Field, Select } from "@/components/ui/field";
 import { useQueryNav, type QueryState } from "@/hooks/use-query-nav";
 import { SERIES_VARS } from "@/lib/chart";
 import { cn } from "@/lib/utils";

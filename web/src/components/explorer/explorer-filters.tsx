@@ -3,7 +3,7 @@
 import { LoaderCircle, RotateCcw, Search } from "lucide-react";
 import { useState } from "react";
 
-import { controlClass, Field, Select } from "@/components/common/field";
+import { controlClass, Field, Select } from "@/components/ui/field";
 import { useQueryNav, type QueryState } from "@/hooks/use-query-nav";
 import { DOC_TYPES } from "@/lib/corpus-types";
 

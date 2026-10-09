@@ -20,8 +20,6 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@base-ui/react": "^1.9.0",
-    "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "domhandler": "^6.0.1",
     "htmlparser2": "^12.0.0",
