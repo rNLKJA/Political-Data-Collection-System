@@ -1,8 +1,14 @@
 name: CI
 
+# Every push is checked. A pull request from a branch of this repository is
+# already covered by the push run on the same commit (its checks show on the
+# PR), so pull_request runs are kept for forks only and nothing runs twice.
 on:
   push:
   pull_request:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -11,6 +17,7 @@ concurrency:
 jobs:
   web:
     name: Web app (lint, format, typecheck, test, build)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,6 +46,7 @@ jobs:
 
   original-parity:
     name: Original notebooks reproduce the CSVs (offline)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
