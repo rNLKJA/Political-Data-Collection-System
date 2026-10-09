@@ -36,10 +36,12 @@ export function parseExplorerParams(sp: RawSearchParams): ExplorerParams {
 }
 
 const groupToken = z.string().regex(/^(rest|cycle-\d{4}|[a-z0-9-]{1,80}(@\d{4})?)$/);
+// "Everyone else" is defined relative to group A, so A itself cannot be "rest".
+const groupTokenA = groupToken.refine((t) => t !== "rest");
 export const ALPHA_OPTIONS = [1_000, 10_000, 100_000] as const;
 
 const distinctiveSchema = z.object({
-  a: groupToken.catch("cycle-2016"),
+  a: groupTokenA.catch("cycle-2016"),
   b: groupToken.catch("cycle-2024"),
   prior: z.coerce
     .number()
@@ -72,10 +74,7 @@ const timelineSchema = z.object({
     .string()
     .max(300)
     .transform((s) =>
-      s
-        .split(",")
-        .filter((x) => /^[a-z0-9-]{1,80}$/.test(x))
-        .slice(0, 3),
+      Array.from(new Set(s.split(",").filter((x) => /^[a-z0-9-]{1,80}$/.test(x)))).slice(0, 3),
     )
     .catch([]),
   by: z.enum(GRANULARITIES).catch("quarter"),

@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
@@ -11,6 +10,9 @@
  * Chart series are a validated neutral categorical palette (no party colours):
  * ochre, teal, plum, olive, rose, steel. Checked with the dataviz validator for
  * both surfaces (adjacent CVD and normal-vision separation, 3:1 contrast).
+ * Role colours, form-control borders and muted chart marks also reach 3:1
+ * against the card surface (WCAG 1.4.11); "other" is a cool slate so it never
+ * reads as the warm moderator grey.
  */
 :root {
   --background: #f3eee3;
@@ -29,7 +31,7 @@
   --accent-foreground: #1e1a15;
   --destructive: #9b2c1f;
   --border: #d8cdb8;
-  --input: #cbbfa7;
+  --input: #8f8371;
   --ring: #24395a;
   --rule: #2b261f;
   --mark: #ecdba3;
@@ -44,10 +46,10 @@
   --series-6: #3e7bb0;
   --role-candidate: #24395a;
   --role-moderator: #9b8f7a;
-  --role-other: #cfc4ae;
+  --role-other: #6b7a84;
   --chart-grid: #e2d9c7;
   --chart-axis: #b9ad96;
-  --chart-muted: #c9bfab;
+  --chart-muted: #988c76;
   --chart-surface: #fbf8f1;
 
   --chart-1: var(--series-1);
@@ -83,7 +85,7 @@
   --accent-foreground: #e4dfd0;
   --destructive: #e08a7a;
   --border: #29312c;
-  --input: #36403a;
+  --input: #5f6b66;
   --ring: #a9bedd;
   --rule: #c9c3b2;
   --mark: #4d4422;
@@ -97,10 +99,10 @@
   --series-6: #5c96cc;
   --role-candidate: #a9bedd;
   --role-moderator: #77715f;
-  --role-other: #4a4a40;
+  --role-other: #7a8790;
   --chart-grid: #222925;
   --chart-axis: #3d4640;
-  --chart-muted: #3a423d;
+  --chart-muted: #66706a;
   --chart-surface: #151a17;
 
   --sidebar: #151a17;
@@ -231,9 +233,9 @@
   .kicker {
     @apply font-mono text-[0.7rem] font-medium tracking-[0.14em] text-muted-foreground uppercase;
   }
+  /* Newspaper section rule: two hairlines, full width. */
   .double-rule {
-    border-top: 1px solid var(--rule);
-    box-shadow: 0 3px 0 -2px var(--rule);
+    border-top: 3px double var(--rule);
   }
   .prose-archive {
     @apply text-[0.975rem] leading-relaxed text-foreground/90;

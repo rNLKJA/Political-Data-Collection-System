@@ -129,7 +129,7 @@ export function TimelineControls({
         <div>
           <p className="kicker mb-1.5">Bucket</p>
           <div
-            role="radiogroup"
+            role="group"
             aria-label="Time bucket"
             className="inline-flex rounded-md border border-border p-0.5"
           >
@@ -139,8 +139,7 @@ export function TimelineControls({
                 <button
                   key={g}
                   type="button"
-                  role="radio"
-                  aria-checked={on}
+                  aria-pressed={on}
                   onClick={() => go({ by: g === "quarter" ? undefined : g })}
                   className={cn(
                     "rounded px-3 py-1 text-xs capitalize",

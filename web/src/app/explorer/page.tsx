@@ -190,7 +190,7 @@ async function ExplorerResults({
             </Panel>
           </div>
 
-          <section aria-labelledby="doc-list-heading">
+          <section id="documents" aria-labelledby="doc-list-heading">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 id="doc-list-heading" className="font-serif text-xl">
                 The documents
@@ -212,7 +212,8 @@ async function ExplorerResults({
               page={result.page}
               pages={result.pages}
               href={(p) =>
-                buildHref("/explorer", { ...state, page: p > 1 ? String(p) : undefined })
+                buildHref("/explorer", { ...state, page: p > 1 ? String(p) : undefined }) +
+                "#documents"
               }
             />
           </section>

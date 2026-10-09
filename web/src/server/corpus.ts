@@ -44,6 +44,23 @@ export interface CorpusOverview {
   zeroWordDocs: number;
 }
 
+/**
+ * Documents by type and by candidate as the 2025 notebook summarised them:
+ * every listing row counts, so a page listed twice counts twice (7,582 rows).
+ */
+export function collectedCounts() {
+  const byType = all<{ docType: string; n: number; docs: number }>(
+    `SELECT doc_type AS docType, SUM(listing_rows) AS n, COUNT(*) AS docs
+       FROM documents GROUP BY doc_type ORDER BY n DESC, doc_type`,
+  );
+  const bySpeaker = all<{ name: string; slug: string; n: number; docs: number }>(
+    `SELECT s.name, s.slug, SUM(d.listing_rows) AS n, COUNT(*) AS docs
+       FROM documents d JOIN speakers s ON s.id = d.speaker_id
+      GROUP BY s.id ORDER BY n DESC, s.name`,
+  );
+  return { byType, bySpeaker };
+}
+
 export function getOverview(): CorpusOverview {
   const meta = getMeta();
   const docs = get<{ first: string; last: string; zero: number }>(

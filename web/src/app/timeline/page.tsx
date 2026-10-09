@@ -2,15 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { LegendSwatch } from "@/components/charts/chart-tooltip";
 import { Callout, EmptyState, SourceLink, StatTile, TableView } from "@/components/common/bits";
 import { PageIntro, Panel } from "@/components/common/page-intro";
 import { TimelineChart, type ChartSeries } from "@/components/timeline/timeline-chart";
 import { TimelineControls } from "@/components/timeline/timeline-controls";
+import { SERIES_VARS } from "@/lib/chart";
 import { DEFAULT_CONCEPT } from "@/lib/concepts";
 import { formatDate, formatDecimal, formatInt } from "@/lib/format";
 import { parseTimelineParams } from "@/lib/params";
 import { normaliseTerm } from "@/lib/textkit";
 import { buildHref } from "@/lib/url";
+import { cn } from "@/lib/utils";
 import { conceptSnippets, getConcepts, getSpeakers, speakerBySlug } from "@/server/corpus";
 import {
   buildTimeline,
@@ -52,15 +55,6 @@ export default function TimelinePage(props: PageProps<"/timeline">) {
   );
 }
 
-/**
- * Palette slots follow the order candidates were added. The first three
- * slots are the ones validated for any pairing, so three series always stay
- * distinguishable.
- */
-function assignSlots(ids: number[]): number[] {
-  return ids.map((_, i) => i);
-}
-
 async function TimelineResults({
   searchParams,
 }: {
@@ -70,7 +64,6 @@ async function TimelineResults({
   const concepts = getConcepts();
   const speakers = getSpeakers();
   const chosen = params.speakers.map((s) => speakerBySlug(s)).filter((s) => !!s);
-  const slots = assignSlots(chosen.map((s) => s.id));
   const term = params.term ? normaliseTerm(params.term) : "";
   const concept = term
     ? undefined
@@ -88,7 +81,9 @@ async function TimelineResults({
       current={current}
       concepts={concepts.map((c) => ({ slug: c.slug, label: c.label }))}
       speakers={speakers.map((s) => ({ slug: s.slug, name: s.name, docs: s.docs }))}
-      selected={chosen.map((s, i) => ({ slug: s.slug, name: s.name, slot: slots[i] }))}
+      // Palette slots follow the order candidates were added; the first three
+      // slots are validated for any pairing, so three series stay distinguishable.
+      selected={chosen.map((s, i) => ({ slug: s.slug, name: s.name, slot: i }))}
     />
   );
 
@@ -135,7 +130,7 @@ async function TimelineResults({
   const chartSeries: ChartSeries[] = series.map((s, i) => ({
     key: s.key,
     label: s.label,
-    slot: chosen.length ? slots[i] : 0,
+    slot: chosen.length ? i : 0,
     points: s.points,
   }));
   const subject = term ? `“${term}”` : concept!.label;
@@ -147,7 +142,8 @@ async function TimelineResults({
         6,
       )
     : [];
-  const docs = term
+  const slotOf = new Map(chosen.map((s, i) => [s.name, i]));
+  const docGroups = term
     ? topDocsForTerm(
         perDoc,
         chosen.map((s) => s.slug),
@@ -231,8 +227,8 @@ async function TimelineResults({
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {concept
-            ? `Short passages (25 words or fewer) from the documents that use ${concept.label.toLowerCase()} terms most${chosen.length ? "" : ", one per speaker"}, picked by count alone. Quoting is not endorsement; each links to the full text.`
-            : "Documents with the most uses of this word. Each links to the full text."}
+            ? `Short passages (25 words or fewer) from the documents that use ${concept.label.toLowerCase()} terms most${chosen.length ? "" : ", one per speaker"}, picked by count. Passages that name another candidate or use name-calling are skipped for the next use. Quoting is not endorsement; each links to the full text.`
+            : `Documents with the most uses of this word${chosen.length > 1 ? ", the same number for each speaker" : ""}. Each links to the full text.`}
         </p>
         {concept ? (
           snippets.length ? (
@@ -248,7 +244,15 @@ async function TimelineResults({
                     {s.snippet.slice(s.hlEnd)}
                   </blockquote>
                   <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                    <span>{s.speaker}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      {slotOf.has(s.speaker) ? (
+                        <LegendSwatch
+                          color={SERIES_VARS[slotOf.get(s.speaker)! % SERIES_VARS.length]}
+                          shape="line"
+                        />
+                      ) : null}
+                      {s.speaker}
+                    </span>
                     <span aria-hidden>·</span>
                     <time dateTime={s.date}>{formatDate(s.date)}</time>
                     <span aria-hidden>·</span>
@@ -262,24 +266,40 @@ async function TimelineResults({
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">No passages for this selection.</p>
           )
-        ) : docs.length ? (
-          <ul className="mt-4 divide-y divide-border/70">
-            {docs.map((d) => (
-              <li key={d.id} className="py-2.5 text-sm">
-                <p className="font-serif leading-snug">{d.title}</p>
-                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                  <span>{d.speaker}</span>
-                  <span aria-hidden>·</span>
-                  <time dateTime={d.date}>{formatDate(d.date)}</time>
-                  <span aria-hidden>·</span>
-                  <span className="tabular">used {formatInt(d.count)}×</span>
-                  <SourceLink href={d.url} className="text-xs">
-                    Read on APP
-                  </SourceLink>
-                </p>
-              </li>
+        ) : docGroups.some((g) => g.docs.length) ? (
+          <div className={cn("mt-4 grid gap-6", docGroups.length > 1 && "md:grid-cols-2")}>
+            {docGroups.map((g) => (
+              <div key={g.group}>
+                {chosen.length ? (
+                  <p className="flex items-center gap-2 text-sm font-medium">
+                    <LegendSwatch color={SERIES_VARS[g.group % SERIES_VARS.length]} shape="line" />
+                    {chosen[g.group]?.name}
+                  </p>
+                ) : null}
+                {g.docs.length ? (
+                  <ul className="mt-1 divide-y divide-border/70">
+                    {g.docs.map((d) => (
+                      <li key={d.id} className="py-2.5 text-sm">
+                        <p className="font-serif leading-snug">{d.title}</p>
+                        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                          <span>{d.speaker}</span>
+                          <span aria-hidden>·</span>
+                          <time dateTime={d.date}>{formatDate(d.date)}</time>
+                          <span aria-hidden>·</span>
+                          <span className="tabular">used {formatInt(d.count)}×</span>
+                          <SourceLink href={d.url} className="text-xs">
+                            Read on APP
+                          </SourceLink>
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">Not used by this speaker.</p>
+                )}
+              </div>
             ))}
-          </ul>
+          </div>
         ) : (
           <p className="mt-4 text-sm text-muted-foreground">Not used by this selection.</p>
         )}

@@ -9,7 +9,8 @@ export type { QueryState };
 
 /**
  * Navigate by patching the current query string. The server re-renders the
- * page for the new parameters; `pending` is true while that happens.
+ * page for the new parameters; `pending` is true while that happens. Each
+ * change is a history entry, so Back undoes the last filter change.
  */
 export function useQueryNav(pathname: string, current: QueryState) {
   const router = useRouter();
@@ -17,7 +18,7 @@ export function useQueryNav(pathname: string, current: QueryState) {
   const go = (patch: QueryState, opts: { resetPage?: boolean } = { resetPage: true }) => {
     const next: QueryState = { ...current, ...patch };
     if (opts.resetPage && !("page" in patch)) delete next.page;
-    startTransition(() => router.replace(buildHref(pathname, next), { scroll: false }));
+    startTransition(() => router.push(buildHref(pathname, next), { scroll: false }));
   };
   return { go, pending };
 }

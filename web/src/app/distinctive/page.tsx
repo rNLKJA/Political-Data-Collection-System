@@ -188,7 +188,7 @@ async function DistinctiveResults({
             </Panel>
           </div>
 
-          <section id="examples" aria-labelledby="examples-heading" className="scroll-mt-24">
+          <section id="examples" aria-labelledby="examples-heading">
             <Panel>
               <h2 id="examples-heading" className="font-serif text-xl">
                 {params.word ? (

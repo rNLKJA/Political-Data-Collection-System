@@ -119,7 +119,14 @@ export function GroupControls({
             <Select
               id="b-speaker"
               value={B.speaker}
-              onChange={(e) => setB(e.target.value, e.target.value === "rest" ? "" : B.cycle)}
+              onChange={(e) => {
+                const speaker = e.target.value;
+                if (speaker === "rest") return setB("rest", "");
+                // "All speakers" needs a cycle; coming from "everyone else" there is
+                // none yet, so pick one that differs from group A's.
+                if (!speaker && !B.cycle) return setB("", A.cycle === "2024" ? "2020" : "2024");
+                setB(speaker, B.cycle);
+              }}
             >
               <option value="rest">Everyone else (all other documents)</option>
               <option value="">All speakers</option>

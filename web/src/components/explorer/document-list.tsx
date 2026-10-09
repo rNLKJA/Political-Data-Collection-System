@@ -70,7 +70,7 @@ export function Pagination({
   return (
     <nav aria-label="Pagination" className="mt-6 flex flex-wrap items-center gap-2">
       {page > 1 ? (
-        <Link href={href(page - 1)} className={linkCls} rel="prev" scroll={false}>
+        <Link href={href(page - 1)} className={linkCls} rel="prev">
           Previous
         </Link>
       ) : null}
@@ -85,14 +85,14 @@ export function Pagination({
               {n}
             </span>
           ) : (
-            <Link href={href(n)} className={linkCls} scroll={false}>
+            <Link href={href(n)} className={linkCls}>
               {n}
             </Link>
           )}
         </span>
       ))}
       {page < pages ? (
-        <Link href={href(page + 1)} className={linkCls} rel="next" scroll={false}>
+        <Link href={href(page + 1)} className={linkCls} rel="next">
           Next
         </Link>
       ) : null}

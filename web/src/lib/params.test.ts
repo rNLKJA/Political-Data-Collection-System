@@ -48,11 +48,18 @@ describe("search parameter parsing", () => {
       a: "ted-cruz@2016",
       b: "rest",
     });
+    // "everyone else" only makes sense for group B
+    expect(parseDistinctiveParams({ a: "rest" }).a).toBe("cycle-2016");
   });
 
   it("caps the timeline at three speakers", () => {
     const p = parseTimelineParams({ speakers: "a,b,c,d", by: "decade" });
     expect(p.speakers).toEqual(["a", "b", "c"]);
     expect(p.by).toBe("quarter");
+  });
+
+  it("drops repeated timeline speakers", () => {
+    const p = parseTimelineParams({ speakers: "bernie-sanders,bernie-sanders,ted-cruz" });
+    expect(p.speakers).toEqual(["bernie-sanders", "ted-cruz"]);
   });
 });

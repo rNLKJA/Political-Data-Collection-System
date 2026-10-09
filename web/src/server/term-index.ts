@@ -4,7 +4,7 @@ import { CYCLES, type Cycle } from "@/lib/corpus-types";
 import { decodePostings } from "@/lib/postings";
 import { DEFAULT_ALPHA0, fightinWords, Z_THRESHOLD } from "@/lib/stats/fightin-words";
 import { rateWithInterval } from "@/lib/stats/poisson";
-import { allMonths, getDocumentsByIds, getSpeakers, speakerBySlug } from "@/server/corpus";
+import { allMonths, getDocumentsByIds, speakerBySlug } from "@/server/corpus";
 import { all } from "@/server/db";
 
 /**
@@ -422,19 +422,24 @@ export function conceptPerDoc(conceptId: number): Map<number, number> {
   return new Map(rows.map((r) => [r.doc_id, r.n]));
 }
 
+/**
+ * Documents that use a word most. With speakers selected, each gets its own
+ * ceil(n / k) documents (as conceptSnippets does for topics), so a comparison
+ * is never one-sided; with none selected the ranking is corpus-wide.
+ */
 export function topDocsForTerm(perDoc: Map<number, number>, speakerSlugs: string[], n = 6) {
   const ix = getIndex();
-  const ids = new Set(
-    speakerSlugs.map((s) => speakerBySlug(s)?.id).filter((x): x is number => x !== undefined),
-  );
-  const hits = Array.from(perDoc.entries())
-    .filter(([d]) => !ids.size || ids.has(ix.speaker[d]))
-    .sort((a, b) => b[1] - a[1] || b[0] - a[0])
-    .slice(0, n);
-  const docs = getDocumentsByIds(hits.map((h) => h[0]));
-  return docs.map((d, i) => ({ ...d, count: hits[i][1] }));
-}
-
-export function speakerOptions() {
-  return getSpeakers().map((s) => ({ slug: s.slug, name: s.name, docs: s.docs }));
+  const ids = speakerSlugs
+    .map((s) => speakerBySlug(s)?.id)
+    .filter((x): x is number => x !== undefined);
+  const ranked = Array.from(perDoc.entries()).sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+  const groups = ids.length
+    ? ids.map((id) =>
+        ranked.filter(([d]) => ix.speaker[d] === id).slice(0, Math.ceil(n / ids.length)),
+      )
+    : [ranked.slice(0, n)];
+  return groups.map((hits, group) => {
+    const docs = getDocumentsByIds(hits.map((h) => h[0]));
+    return { group, docs: docs.map((d, i) => ({ ...d, count: hits[i][1] })) };
+  });
 }

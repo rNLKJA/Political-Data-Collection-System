@@ -44,6 +44,7 @@ export function MobileNav() {
   const [open, setOpen] = useState(false);
   const [lastPath, setLastPath] = useState(pathname);
   const panelRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   // Close the menu after navigating.
   if (lastPath !== pathname) {
@@ -53,15 +54,30 @@ export function MobileNav() {
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      toggleRef.current?.focus();
+    };
+    // Close on a press anywhere outside the menu and its toggle.
+    const onPointer = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (panelRef.current?.contains(t) || toggleRef.current?.contains(t)) return;
+      setOpen(false);
+    };
     window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
     panelRef.current?.querySelector("a")?.focus();
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
   }, [open]);
 
   return (
     <div className="md:hidden">
       <button
+        ref={toggleRef}
         type="button"
         aria-expanded={open}
         aria-controls="mobile-nav"

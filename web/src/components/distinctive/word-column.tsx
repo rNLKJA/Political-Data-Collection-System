@@ -69,7 +69,6 @@ export function WordColumn({
                 <td className="py-1.5 pr-2">
                   <Link
                     href={hrefFor(w.term)}
-                    scroll={false}
                     className="font-mono text-[0.85rem] hover:underline"
                     title={`Show documents that use “${w.term}” (${formatInt(w.yA)} in A, ${formatInt(w.yB)} in B)`}
                   >

@@ -49,13 +49,33 @@ export function FunnelPlot({
   const ordered = useMemo(() => [...cloud].sort((p, q) => p[2] - q[2]), [cloud]);
   const narrow = width < 520;
 
-  // Greedy placement: try the right of the dot, then the left; a label that
-  // would collide with one already placed keeps its dot (and tooltip) only.
+  // Greedy placement, strongest words first: try the right of the dot, then
+  // the left. A label may not cover another label or another highlighted dot.
+  // Dots that sit on top of each other share the strongest word's label; the
+  // others keep their tooltip only.
+  const pos = labels.map((l) => ({ cx: x(l.x), cy: y(l.z) }));
+  const near = (i: number, j: number) =>
+    Math.hypot(pos[i].cx - pos[j].cx, pos[i].cy - pos[j].cy) < 9;
+  const overlaps = (
+    a: { x0: number; x1: number; y0: number; y1: number },
+    b: { x0: number; x1: number; y0: number; y1: number },
+  ) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+  const dotBox = (j: number) => ({
+    x0: pos[j].cx - 6.5,
+    x1: pos[j].cx + 6.5,
+    y0: pos[j].cy - 6.5,
+    y1: pos[j].cy + 6.5,
+  });
   const placed: Array<{ x0: number; x1: number; y0: number; y1: number }> = [];
-  const placements = labels.map((l) => {
-    const cx = x(l.x);
-    const cy = y(l.z);
-    const w = l.term.length * 6.4 + 4;
+  const labelled: number[] = [];
+  const texts: Array<{ anchor: "start" | "end"; tx: number } | null> = labels.map(() => null);
+  const order = labels
+    .map((_, i) => i)
+    .sort((a, b) => Math.abs(labels[b].z) - Math.abs(labels[a].z));
+  for (const i of order) {
+    if (labelled.some((j) => near(i, j))) continue;
+    const { cx, cy } = pos[i];
+    const w = labels[i].term.length * 6.4 + 4;
     const options = [
       { anchor: "start" as const, tx: cx + 7, x0: cx + 5, x1: cx + 7 + w },
       { anchor: "end" as const, tx: cx - 7, x0: cx - 7 - w, x1: cx - 5 },
@@ -63,16 +83,18 @@ export function FunnelPlot({
     for (const o of options) {
       const box = { x0: o.x0, x1: o.x1, y0: cy - 7, y1: cy + 7 };
       if (box.x0 < 0 || box.x1 > innerW + m.right) continue;
-      const clash = placed.some(
-        (b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0,
-      );
+      const clash =
+        placed.some((b) => overlaps(box, b)) ||
+        pos.some((_, j) => j !== i && !near(i, j) && overlaps(box, dotBox(j)));
       if (!clash) {
         placed.push(box);
-        return { l, cx, cy, text: o };
+        labelled.push(i);
+        texts[i] = { anchor: o.anchor, tx: o.tx };
+        break;
       }
     }
-    return { l, cx, cy, text: null };
-  });
+  }
+  const placements = labels.map((l, i) => ({ l, cx: pos[i].cx, cy: pos[i].cy, text: texts[i] }));
   const shownLabels = narrow ? placements.filter((_, i) => i % 2 === 0) : placements;
 
   return (

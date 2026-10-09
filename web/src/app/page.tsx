@@ -6,12 +6,13 @@ import { BarList, StatTile, ToolCard } from "@/components/common/bits";
 import { Panel, Section } from "@/components/common/page-intro";
 import { formatCompact, formatDateLong, formatInt } from "@/lib/format";
 import { APP_CITATION, SITE } from "@/lib/site";
-import { allMonths, exploreDocuments, getOverview } from "@/server/corpus";
+import { allMonths, collectedCounts, exploreDocuments, getOverview } from "@/server/corpus";
 import { listDebates } from "@/server/debates";
 
 export default function HomePage() {
   const o = getOverview();
   const all = exploreDocuments({}, 1);
+  const collected = collectedCounts();
   const months = allMonths();
   const counts = Object.fromEntries(all.months.map((m) => [m.month, m.n]));
   const debates = listDebates();
@@ -131,31 +132,40 @@ export default function HomePage() {
         id="original"
         kicker="What the 2025 scrapers produced"
         title="The original results, as collected"
-        description="These figures come straight from the scraper's own fields; the revived site keeps them and adds analysis on top."
+        description="The summary the 2025 notebook printed, from its own fields and all of its listing rows. The rest of the site counts each document once."
         className="mt-20"
       >
         <div className="grid gap-6 lg:grid-cols-2">
           <Panel>
             <h3 className="font-serif text-lg">Documents by type</h3>
             <p className="mt-1 mb-4 text-xs text-muted-foreground">
-              Assigned from title words by the scraper. Counted once per document: the{" "}
-              {formatInt(o.listingRows)} listing rows include{" "}
-              {formatInt(o.listingRows - o.documents)} duplicates.
+              Assigned from title words by the scraper. All {formatInt(o.listingRows)} listing rows,
+              as collected; {formatInt(o.listingRows - o.documents)} of them list a page a second
+              time, so the site works with {formatInt(o.documents)} documents.
             </p>
             <BarList
-              items={all.byType.map((t) => ({ key: t.docType, label: t.docType, value: t.n }))}
+              items={collected.byType.map((t) => ({
+                key: t.docType,
+                label: t.docType,
+                value: t.n,
+                note: t.docs !== t.n ? `${formatInt(t.docs)} once each` : undefined,
+              }))}
               format={formatInt}
             />
           </Panel>
           <Panel>
             <h3 className="font-serif text-lg">Documents by candidate</h3>
             <p className="mt-1 mb-4 text-xs text-muted-foreground">
-              The archive&apos;s own filing; volumes reflect how much each campaign released.
+              The archive&apos;s own filing, as collected; volumes reflect how much each campaign
+              released. Top eight of {formatInt(o.speakers)}.
             </p>
             <BarList
-              items={all.bySpeaker
-                .slice(0, 8)
-                .map((s) => ({ key: s.slug, label: s.name, value: s.n }))}
+              items={collected.bySpeaker.slice(0, 8).map((s) => ({
+                key: s.slug,
+                label: s.name,
+                value: s.n,
+                note: s.docs !== s.n ? `${formatInt(s.docs)} once each` : undefined,
+              }))}
               format={formatInt}
             />
           </Panel>

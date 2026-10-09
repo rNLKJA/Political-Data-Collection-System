@@ -3,7 +3,7 @@ export const SITE = {
   url: "https://campaign-text-lab.vercel.app",
   repo: "https://github.com/rNLKJA/Political-Data-Collection-System",
   description:
-    "A descriptive reading room for 7,556 US campaign documents (2016 to 2024) and 179 presidential and vice-presidential debate transcripts (1960 to 2024), built from a personal scraper of The American Presidency Project.",
+    "A descriptive reading room for 7,556 US campaign documents (2016 to 2024) and 179 debate transcripts (49 general-election and vice-presidential, 130 primary; 1960 to 2024), built from a personal scraper of The American Presidency Project.",
   app: "https://www.presidency.ucsb.edu",
 } as const;
 
