@@ -28,6 +28,11 @@ export function WordColumn({
         <LegendSwatch color={color} />
         <span>More characteristic of {title}</span>
       </h3>
+      {words.length ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Select a word to see the documents that use it most.
+        </p>
+      ) : null}
       {words.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">No word leans this way.</p>
       ) : (
@@ -69,7 +74,7 @@ export function WordColumn({
                 <td className="py-1.5 pr-2">
                   <Link
                     href={hrefFor(w.term)}
-                    className="font-mono text-[0.85rem] hover:underline"
+                    className="font-mono text-[0.85rem] underline decoration-primary/50 decoration-dotted underline-offset-4 hover:text-primary hover:decoration-solid"
                     title={`Show documents that use “${w.term}” (${formatInt(w.yA)} in A, ${formatInt(w.yB)} in B)`}
                   >
                     {w.term}

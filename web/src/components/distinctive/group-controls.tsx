@@ -167,10 +167,11 @@ export function GroupControls({
             </button>
           ))}
         </div>
-        <div className="flex items-end gap-3">
+        <div className="flex items-end">
+          {/* No gap on the row: the live region is empty (zero width) when idle. */}
           <p className="pb-2.5 text-xs text-muted-foreground" aria-live="polite">
             {pending ? (
-              <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1.5 pr-3">
                 <LoaderCircle className="size-3.5 animate-spin" aria-hidden /> Recomputing…
               </span>
             ) : null}

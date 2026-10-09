@@ -24,7 +24,7 @@ export function NavLinks() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "rounded-md px-2.5 py-1.5 text-sm transition-colors",
+                "rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors",
                 active
                   ? "bg-secondary font-medium text-foreground"
                   : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
@@ -75,7 +75,7 @@ export function MobileNav() {
   }, [open]);
 
   return (
-    <div className="md:hidden">
+    <div className="lg:hidden">
       <button
         ref={toggleRef}
         type="button"
