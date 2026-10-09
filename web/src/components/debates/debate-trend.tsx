@@ -90,13 +90,12 @@ export function DebateTrend({ points }: { points: TrendPoint[] }) {
 
   return (
     <div>
-      <div role="tablist" aria-label="Measure" className="flex flex-wrap gap-2">
+      <div role="group" aria-label="Measure" className="flex flex-wrap gap-2">
         {METRICS.map((mm) => (
           <button
             key={mm.key}
-            role="tab"
             type="button"
-            aria-selected={metric === mm.key}
+            aria-pressed={metric === mm.key}
             onClick={() => setMetric(mm.key)}
             className={cn(
               "rounded-full border px-3 py-1 text-xs transition-colors",

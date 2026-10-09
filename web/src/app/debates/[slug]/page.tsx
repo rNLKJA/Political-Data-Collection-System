@@ -11,6 +11,11 @@ import { DEBATE_KIND_LABEL, ROLE_LABEL } from "@/lib/corpus-types";
 import { formatDateLong, formatDecimal, formatInt, formatPercent } from "@/lib/format";
 import { getDebate, listDebates } from "@/server/debates";
 
+// Every transcript is known at build time. Requiring the complete page to be
+// static makes an unknown slug wait for the full render, so notFound() can
+// still answer with a real 404 status instead of a streamed fallback.
+export const ensureStatic = "navigation";
+
 export function generateStaticParams() {
   return listDebates().map((d) => ({ slug: d.slug }));
 }

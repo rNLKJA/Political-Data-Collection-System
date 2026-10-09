@@ -11,7 +11,7 @@ import {
 } from "@/components/method/playgrounds";
 import candidates from "@/data/debate-candidates.json";
 import parity from "@/data/parity-python.json";
-import { formatCompact, formatInt, formatPercent } from "@/lib/format";
+import { formatInt, formatPercent } from "@/lib/format";
 import { APP_CITATION, SITE } from "@/lib/site";
 import { getConcepts, getOverview } from "@/server/corpus";
 
@@ -46,7 +46,10 @@ function Step({ n, title, children }: { n: string; title: string; children: Reac
 
 function Formula({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <figure className="my-4 overflow-x-auto rounded-md border border-border bg-background/70 px-4 py-3">
+    <figure
+      tabIndex={0}
+      className="my-4 overflow-x-auto rounded-md border border-border bg-background/70 px-4 py-3"
+    >
       <figcaption className="kicker mb-2">{label}</figcaption>
       <div className="font-[ui-monospace,SFMono-Regular,Menlo,Consolas,monospace] text-[0.82rem] leading-7 whitespace-pre">
         {children}
@@ -176,10 +179,10 @@ export default function MethodPage() {
                 </ol>
               </div>
             </div>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <ol className="mt-6 grid gap-3 sm:grid-cols-3">
               <Step n="2026 · build" title="scripts/build_analytics.py">
-                Run with uv. Reads the three CSVs from original/ and writes a{" "}
-                {formatCompact(9_100_000)}B read-only SQLite file of derived data: no running text.
+                Run with uv. Reads the three CSVs from original/ and writes a 9 MB read-only SQLite
+                file of derived data: no running text.
               </Step>
               <Step n="2026 · serve" title="Next.js on the server">
                 Pages query the database with Node&apos;s built-in node:sqlite. Static pages are
@@ -189,7 +192,7 @@ export default function MethodPage() {
                 The TypeScript ports and the statistics are re-checked against the original CSVs on
                 every push.
               </Step>
-            </div>
+            </ol>
           </Section>
 
           <Section
@@ -199,7 +202,12 @@ export default function MethodPage() {
             description="Two independent checks. scripts/parity_check.py executes the notebook cells verbatim, with the network replaced by a stub that serves pages rebuilt from the stored data. The Vitest suites then run the TypeScript ports over the same CSVs."
             className="px-0 sm:px-0"
           >
-            <div className="overflow-x-auto rounded-lg border border-border">
+            <div
+              className="overflow-x-auto rounded-lg border border-border"
+              role="region"
+              aria-label="Parity checks (scrolls sideways on small screens)"
+              tabIndex={0}
+            >
               <table className="w-full min-w-[40rem] text-left text-sm">
                 <caption className="sr-only">Parity checks and their results</caption>
                 <thead className="bg-secondary text-xs">
