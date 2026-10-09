@@ -387,7 +387,8 @@ def readability() -> dict:
                 "speakers": len(set(keys)),
                 "mean": float(g.mean()),
             }
-            if len(g) >= 5 and len(set(keys)) >= 5:
+            # MIN_GROUP_FOR_INTERVAL and MIN_CLUSTERS_FOR_INTERVAL (DR-008)
+            if len(g) >= 5 and len(set(keys)) >= 10:
                 # speakers resampled: a speaker's documents move together
                 cell["interval"] = boot_cluster_mean(g, keys)
                 # documents resampled as if independent, for comparison only

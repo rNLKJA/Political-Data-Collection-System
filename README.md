@@ -60,23 +60,26 @@ checks and the evaluation that a careful analyst would want next.
   cycles resampled), but the same speakers' transcribed remarks grade 5.5 levels below their
   written releases (95% t interval 4.1 to 6.9, 14 speakers, paired; all 14 lower), mostly
   through sentence length, and two transcripts of the same 2000 debate differ by up to 1.4
-  levels for one speaker.
+  levels for one speaker who has the same words in both. Document cells from fewer than ten
+  speakers show a mean and no interval, because a cluster bootstrap runs narrow below that.
 - **An honest LLM evaluation.** A CAP-style codebook of 21 policy topics plus "none", a keyword
   dictionary frozen before the gold set was drawn, and a seeded, keyword-blind gold set of 120
   one-sentence excerpts. The keyword rules agree with the gold labels on 75.8% of excerpts (95%
   CI 67.4% to 82.6%), Cohen's kappa 0.59 (0.45 to 0.71). The gold labels are a single-annotator
   draft prepared by the AI coding assistant that built the upgrade, which also wrote the keyword
-  dictionary, so they are independent of neither labeller and not yet reviewed by a person; the
-  page says so above every score. A request that fails or is stopped is left out of the scores
-  for both labellers, never counted against the model.
+  dictionary, so they are independent of neither labeller and no person has labelled them yet.
+  Their provenance is recorded as fields and a note worded from those fields sits above every
+  score; the plan to replace them is a blind relabel by two people (DR-007). A request that
+  fails or is stopped is left out of the scores for both labellers, never counted against the
+  model.
 - **Statistics checked against Python.** `scripts/stats_reference.py` recomputes the Wilson
   intervals (statsmodels), kappa and per-class metrics (scikit-learn), McNemar's test
   (statsmodels), OLS, t quantiles and the sign test (SciPy), the row and cluster bootstraps
   (numpy with a port of the same seeded generator), the word-list stability (an independent
   Python port) and every readability summary (from the database). The Vitest suite compares the
   TypeScript to these values.
-- **Written decisions.** Decision records DR-001 to DR-006 and a model card, rendered under
-  `/methods`.
+- **Written decisions.** Decision records DR-001 to DR-008 and a model card, rendered under
+  `/methods`; a record that a later one amends carries an "Amended by" notice.
 
 ### Ground rules
 
@@ -107,8 +110,11 @@ label the policy topic of short excerpts so it can be compared with the keyword 
    exports with a simulated labeller that calls nothing; its output is labelled "Simulated, not
    AI".
 
-Every model output is labelled "AI-generated". You can accept, correct or reject each run;
-corrections are logged as edits and never change the scores. If a request fails (key, network,
+Every model output is labelled "AI-generated", and every exported row says who labelled it
+(`AI-generated: provider/model`, or `simulated (no model called)`), with the run id and seed.
+You can accept, correct or reject each run, and accept or reject any single call later from
+the log; corrections are logged as edits and never change the scores. A run with your key is
+offered only when the browser can keep the audit log. If a request fails (key, network,
 rate limit, server error) or you press Stop, its excerpts are left out of the scores for both
 labellers and the run is marked incomplete; failed calls stay in the log, with nothing to accept.
 
@@ -117,7 +123,10 @@ labellers and the run is marked incomplete; failed calls stay in the log, with n
 Open `/ai-log` (also linked from the footer and the AI settings dialog). Each call, failed call
 and simulated run appears with its timestamp, provider, requested and served model, the exact
 system prompt and user message, the validated answer (or the raw text when it failed), latency,
-token usage, retries and your decision. **Export JSON** and **Export CSV** download the log;
+token usage, retries, the generation settings sent (token ceiling, temperature or effort), a
+hash of the output schema, your decision and the history of every decision you made on it.
+Calls still awaiting review can be accepted or rejected there, with a note. **Export JSON** and
+**Export CSV** download the log;
 **Clear log** deletes it. The log lives in your browser's IndexedDB (database
 `campaign-text-lab`, store `ai_audit_log`); this site has no database to send it to.
 
@@ -130,7 +139,7 @@ token usage, retries and your decision. **Export JSON** and **Export CSV** downl
 - [`docs/decisions/`](docs/decisions/) holds the decision records, each in the same order:
   decision first, context, options, why, what happened (weak numbers included) and what I'd
   change. They are rendered at `/methods/decisions/<slug>`. A past record is never edited; a
-  new one supersedes it.
+  new one supersedes or amends it, and the older record's page links to it.
 
 Because the deployment uploads `web/` only, the documents are mirrored into `web/content` by
 `pnpm sync:docs`, and a test fails if the copies drift from `docs/`.
@@ -167,12 +176,13 @@ Because the deployment uploads `web/` only, the documents are mirrored into `web
 │   └── _archive/                the first README
 ├── docs/
 │   ├── model-card.md            the two topic labellers
-│   └── decisions/               DR-001 to DR-006 and an index
+│   └── decisions/               DR-001 to DR-008 and an index
 ├── scripts/                     reproducible data build (uv, PEP 723 inline dependencies)
 │   ├── parity_check.py          runs the notebook code offline against the stored HTML/CSV
 │   ├── build_analytics.py       writes web/data/analytics.db and the test fixtures
 │   ├── build_topic_eval.py      draws the 120 seeded excerpts for the topic evaluation
 │   ├── stats_reference.py       reference values from numpy, SciPy, statsmodels, scikit-learn
+│   ├── score_relabel.py         scores a blind relabel of the topic gold set (DR-007)
 │   ├── date_fixtures.py         CPython 3.11 date results for the TypeScript differential test
 │   ├── textkit.py               tokeniser, document cleaning, readability, topic list
 │   └── debatekit.py             debate turn segmentation and roles
@@ -236,10 +246,24 @@ uv run scripts/stats_reference.py  # ~15 s: reference values for the statistics 
 `build_topic_eval.py` rewrites only `web/src/data/topic-eval-items.json`; the gold labels in
 `web/src/data/topic-gold.json` are edited directly in that file and never touched by a script.
 The current labels are a draft prepared by the AI coding assistant that built the upgrade, which
-also wrote the keyword dictionary, so they are independent of neither labeller and await human
-review. To review them, edit the labels (the file records who labelled them and a `status`), set
-`status` to `reviewed` and run the tests: the model card's baseline numbers are checked against
-the computed scores, so update `docs/model-card.md` and run `pnpm sync:docs` if they change.
+also wrote the keyword dictionary, so they are independent of neither labeller. Do not review
+them in place: a draft anchors its reviewer. Replace them with a blind relabel instead
+([DR-007](docs/decisions/DR-007-blind-relabel-for-the-gold-set.md)):
+
+1. Two people, at least one of whom has not seen `web/src/lib/topics/keyword-rules.ts`, each
+   download the coding sheet from `/topics/blind-relabel.csv` (ids and excerpts only) and fill
+   in the `topic` column from the codebook and coding rules, without seeing the draft or each
+   other's sheet.
+2. `uv run scripts/score_relabel.py coder-a.csv coder-b.csv` reports agreement (Wilson
+   interval), Cohen's kappa (bootstrap interval) and Krippendorff's alpha between the coders and
+   for each coder against the draft, and lists the disagreements to resolve.
+3. Commit the resolved labels as `version: 2` with the `provenance` fields filled in: `method`
+   set to `blind-relabel`, then `coders`, `human_coders`, `blind_to_keyword_rules`,
+   `intercoder_kappa` and `kappa_vs_ai_draft`. The note on `/topics` and `/methods` is worded
+   from those fields.
+4. Run the tests: the model card's baseline numbers are checked against the computed scores, so
+   update `docs/model-card.md`, write a new decision record with the outcome, and run
+   `pnpm sync:docs`.
 
 `build_analytics.py` de-duplicates the 26 repeated listing rows, keeps only text in each
 candidate's own voice (interviewer, moderator and audience turns inside transcripts are dropped),

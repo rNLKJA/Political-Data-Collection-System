@@ -3,7 +3,7 @@ import "server-only";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { parseDecisionRecord, splitTitle, type DecisionRecord } from "@/lib/docs";
+import { linkAmendments, parseDecisionRecord, splitTitle, type DecisionRecord } from "@/lib/docs";
 
 /**
  * The markdown documents under web/content (copied from the repository's docs/
@@ -15,10 +15,12 @@ export function contentDir(): string {
 
 export function listDecisions(): DecisionRecord[] {
   const dir = path.join(contentDir(), "decisions");
-  return readdirSync(dir)
-    .filter((f) => /^DR-\d{3}-.+\.md$/.test(f))
-    .sort()
-    .map((f) => parseDecisionRecord(f, readFileSync(path.join(dir, f), "utf8")));
+  return linkAmendments(
+    readdirSync(dir)
+      .filter((f) => /^DR-\d{3}-.+\.md$/.test(f))
+      .sort()
+      .map((f) => parseDecisionRecord(f, readFileSync(path.join(dir, f), "utf8"))),
+  );
 }
 
 export function getDecision(slug: string): DecisionRecord | undefined {

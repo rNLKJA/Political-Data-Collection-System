@@ -93,3 +93,9 @@ export function slugify(s: string): string {
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${formatInt(n)} ${n === 1 ? one : many}`;
 }
+
+/** "“A”, “B” and “C”": quoted names joined as an English list (names may contain "and"). */
+export function quotedList(items: readonly string[]): string {
+  const q = items.map((s) => `“${s}”`);
+  return q.length <= 1 ? (q[0] ?? "") : `${q.slice(0, -1).join(", ")} and ${q[q.length - 1]}`;
+}

@@ -1,6 +1,13 @@
 {
  "version": 1,
- "status": "draft",
+ "provenance": {
+  "method": "ai-draft",
+  "coders": 1,
+  "human_coders": 0,
+  "blind_to_keyword_rules": false,
+  "intercoder_kappa": null,
+  "kappa_vs_ai_draft": null
+ },
  "codebook": "CAP-style major topics, adapted (web/src/lib/topics/codebook.ts)",
  "annotator": "One annotator. Labels were assigned item by item against the written codebook and coding rules, before either automatic labeller had been run on the items. This first pass was drafted by the AI coding assistant (Claude) that built the 2026 upgrade, working for Rin; it has not yet been reviewed by a human.",
  "labelled_on": "2026-10-10",

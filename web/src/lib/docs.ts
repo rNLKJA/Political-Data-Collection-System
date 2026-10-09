@@ -22,7 +22,44 @@ export type DecisionRecord = {
   recorded: string;
   /** markdown after the H1 */
   body: string;
+  /** earlier records this one amends, corrects or supersedes ("DR-004") */
+  amends: string[];
+  /** later records that amend this one (filled in by `linkAmendments`) */
+  amendedBy: Array<{ id: string; slug: string; title: string }>;
 };
+
+const CHANGE_WORDS = /\b(amend(s|ed)?|correct(s|ed|ions?)?|supersed(e|es|ed)|replac(e|es|ed))\b/i;
+
+/**
+ * The records a record changes: an "Amends" column in its meta table, or any
+ * sentence of its decision line that both names a record and says it amends,
+ * corrects, supersedes or replaces it ("This amends the scoring rule of
+ * DR-004", "Two statements in DR-003 are corrected here").
+ */
+export function parseAmends(
+  id: string,
+  decision: string,
+  meta: Readonly<Record<string, string>>,
+): string[] {
+  const found = new Set<string>();
+  for (const m of (meta.Amends ?? "").matchAll(/DR-\d{3}/g)) found.add(m[0]);
+  for (const sentence of decision.split(/(?<=\.)\s+/)) {
+    if (!CHANGE_WORDS.test(sentence)) continue;
+    for (const m of sentence.matchAll(/DR-\d{3}/g)) found.add(m[0]);
+  }
+  found.delete(id);
+  return [...found].sort();
+}
+
+/** Point each record at the later records that amend it. */
+export function linkAmendments(records: readonly DecisionRecord[]): DecisionRecord[] {
+  return records.map((r) => ({
+    ...r,
+    amendedBy: records
+      .filter((later) => later.amends.includes(r.id))
+      .map((later) => ({ id: later.id, slug: later.slug, title: later.title })),
+  }));
+}
 
 /** "DR-001-foo-bar.md" -> "dr-001-foo-bar" */
 export function decisionSlug(file: string): string {
@@ -63,16 +100,19 @@ export function parseDecisionRecord(file: string, markdown: string): DecisionRec
   const decisionLine = /^\*\*Decision:\*\*\s*(.+)$/m.exec(body);
   if (!decisionLine) throw new Error(`${file}: the decision must be stated first`);
   const meta = firstTable(body);
+  const decision = stripMarkdown(decisionLine[1]);
   return {
     slug: decisionSlug(file),
     file,
     id: m[1],
     title: m[2].trim(),
-    decision: stripMarkdown(decisionLine[1]),
+    decision,
     status: meta.Status ?? "",
     decided: meta.Decided ?? "",
     recorded: meta.Recorded ?? "",
     body,
+    amends: parseAmends(m[1], decision, meta),
+    amendedBy: [],
   };
 }
 

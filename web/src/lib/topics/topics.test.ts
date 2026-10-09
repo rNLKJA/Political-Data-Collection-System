@@ -3,7 +3,17 @@ import { describe, expect, it } from "vitest";
 import { words } from "@/lib/textkit";
 
 import { CODEBOOK, isTopicId, TOPIC_IDS } from "./codebook";
-import { EVAL_ITEMS, GOLD_META, SAMPLE_META } from "./data";
+import {
+  EVAL_ITEMS,
+  GOLD_META,
+  goldIsProvisional,
+  goldProvenanceNote,
+  SAMPLE_META,
+  type GoldProvenance,
+} from "./data";
+import { quotedList } from "@/lib/format";
+
+import { BLIND_SHEET_COLUMNS, blindRelabelCsv, blindRelabelRows } from "./relabel";
 import { comparePaired, scoreLabeller } from "./evaluation";
 import { KEYWORDS, keywordLabel, keywordMatches } from "./keyword-rules";
 import { hashString, MOCK_ACCURACY, mockLabel } from "./mock-labeller";
@@ -67,7 +77,98 @@ describe("evaluation set", () => {
   it("labels every excerpt with a codebook topic and says who labelled it", () => {
     expect(EVAL_ITEMS.every((i) => isTopicId(i.gold))).toBe(true);
     expect(GOLD_META.annotator.length).toBeGreaterThan(40);
-    expect(["draft", "reviewed"]).toContain(GOLD_META.status);
+    const p = GOLD_META.provenance;
+    expect(["ai-draft", "edited-ai-draft", "blind-relabel"]).toContain(p.method);
+    expect(p.coders).toBeGreaterThanOrEqual(1);
+    expect(p.humanCoders).toBeLessThanOrEqual(p.coders);
+    if (p.method === "ai-draft") expect(p.humanCoders).toBe(0);
+    if (p.method !== "ai-draft") expect(p.humanCoders).toBeGreaterThan(0);
+  });
+});
+
+describe("gold provenance", () => {
+  const base: GoldProvenance = {
+    method: "ai-draft",
+    coders: 1,
+    humanCoders: 0,
+    blindToKeywordRules: false,
+    intercoderKappa: null,
+    kappaVsAiDraft: null,
+  };
+
+  it("always has a note, worded from the fields, for every method", () => {
+    const draft = goldProvenanceNote(base);
+    expect(draft.title).toMatch(/AI draft/);
+    expect(draft.text).toMatch(/no person has labelled them/);
+    expect(draft.text).toMatch(/blind relabel/);
+    expect(goldIsProvisional(base)).toBe(true);
+
+    const edited = goldProvenanceNote({
+      ...base,
+      method: "edited-ai-draft",
+      coders: 2,
+      humanCoders: 1,
+      kappaVsAiDraft: 0.912,
+    });
+    expect(edited.title).toMatch(/edited AI draft/);
+    expect(edited.text).toMatch(/anchors the reviewer/);
+    expect(edited.text).toContain("kappa 0.91");
+    expect(goldIsProvisional({ ...base, method: "edited-ai-draft", humanCoders: 1 })).toBe(true);
+
+    const blind: GoldProvenance = {
+      method: "blind-relabel",
+      coders: 2,
+      humanCoders: 2,
+      blindToKeywordRules: true,
+      intercoderKappa: 0.71,
+      kappaVsAiDraft: 0.64,
+    };
+    const note = goldProvenanceNote(blind);
+    expect(note.title).toMatch(/blind relabel/);
+    expect(note.text).toContain("kappa 0.71");
+    expect(note.text).toContain("kappa 0.64");
+    expect(note.text).not.toMatch(/had seen the keyword dictionary/);
+    expect(goldIsProvisional(blind)).toBe(false);
+
+    // one blind coder is still provisional, and a coder who saw the dictionary is disclosed
+    const single = goldProvenanceNote({
+      ...blind,
+      humanCoders: 1,
+      coders: 1,
+      blindToKeywordRules: false,
+      intercoderKappa: null,
+    });
+    expect(single.text).toMatch(/provisional/);
+    expect(single.text).toMatch(/had seen the keyword dictionary/);
+    expect(goldIsProvisional({ ...blind, humanCoders: 1 })).toBe(true);
+  });
+});
+
+describe("quoted lists", () => {
+  it("joins names that may themselves contain 'and'", () => {
+    expect(quotedList([])).toBe("");
+    expect(quotedList(["Culture and the arts"])).toBe("“Culture and the arts”");
+    expect(quotedList(["Transportation", "Social welfare", "Culture and the arts"])).toBe(
+      "“Transportation”, “Social welfare” and “Culture and the arts”",
+    );
+  });
+});
+
+describe("blind relabel sheet", () => {
+  it("holds ids and excerpts only, with empty columns for the coder", () => {
+    const rows = blindRelabelRows();
+    expect(rows).toHaveLength(EVAL_ITEMS.length);
+    expect(Object.keys(rows[0])).toEqual([...BLIND_SHEET_COLUMNS]);
+    expect(rows.every((r) => r.topic === "" && r.note === "")).toBe(true);
+    expect(rows.map((r) => r.id)).toEqual([...EVAL_ITEMS.map((i) => i.id)].sort());
+    const csv = blindRelabelCsv();
+    expect(csv.split("\r\n")[0]).toBe("id,excerpt,topic,note");
+    // nothing that would unblind the coder: no gold label, keyword label, source or coder's note
+    for (const it of EVAL_ITEMS) {
+      expect(csv).not.toContain(it.url);
+      if (it.note) expect(csv).not.toContain(it.note);
+    }
+    expect(csv).not.toMatch(/gold|rules|keyword/i);
   });
 });
 

@@ -11,7 +11,7 @@ import {
 } from "@/components/method/playgrounds";
 import candidates from "@/data/debate-candidates.json";
 import parity from "@/data/parity-python.json";
-import { formatInt, formatPercent } from "@/lib/format";
+import { formatInt, formatPercent, quotedList } from "@/lib/format";
 import { APP_CITATION, SITE } from "@/lib/site";
 import { getConcepts, getOverview } from "@/server/corpus";
 import { listDecisions } from "@/server/docs";
@@ -20,8 +20,21 @@ import { buildSystemPrompt } from "@/lib/ai/topic-labels";
 import { ANTHROPIC_MODELS, DEFAULT_OPENAI_MODEL } from "@/lib/ai/providers";
 import { DEFAULT_SEED } from "@/lib/stats/bootstrap";
 import { STABILITY_RESAMPLES } from "@/lib/stats/fw-stability";
-import { READABILITY_RESAMPLES } from "@/lib/readability-stats";
-import { EVAL_ITEMS, EXCERPTS_NAMING_CANDIDATE, GOLD_META, SAMPLE_META } from "@/lib/topics/data";
+import {
+  MIN_CLUSTERS_FOR_INTERVAL,
+  MIN_GROUP_FOR_INTERVAL,
+  READABILITY_RESAMPLES,
+} from "@/lib/readability-stats";
+import {
+  EVAL_ITEMS,
+  EXCERPTS_NAMING_CANDIDATE,
+  GOLD_META,
+  GOLD_METHOD_LABEL,
+  goldIsProvisional,
+  goldProvenanceNote,
+  SAMPLE_META,
+} from "@/lib/topics/data";
+import { CODEBOOK } from "@/lib/topics/codebook";
 import { scoreLabeller } from "@/lib/topics/evaluation";
 import { KEYWORD_RULES_VERSION, keywordLabel } from "@/lib/topics/keyword-rules";
 
@@ -110,6 +123,22 @@ export default function MethodPage() {
     (c) => c.cycle === 2024 && c.register === "written",
   )!;
   const namedCount = EXCERPTS_NAMING_CANDIDATE;
+  const provenance = GOLD_META.provenance;
+  const provenanceNote = goldProvenanceNote(provenance);
+  // the clusters behind every readability interval shown (speakers or cycles)
+  const clusterCounts = [
+    ...readability.docs.cells.flatMap((c) => (c.grade?.clusters ? [c.grade.clusters] : [])),
+    readability.general.trend.cycles,
+    readability.primary.trend.cycles,
+  ];
+  const policyTopicCounts = CODEBOOK.filter((t) => t.id !== "none").map((t) => ({
+    label: t.label,
+    n: EVAL_ITEMS.filter((i) => i.gold === t.id).length,
+  }));
+  const maxPerTopic = Math.max(...policyTopicCounts.map((t) => t.n));
+  const missingTopics = policyTopicCounts.filter((t) => t.n === 0).map((t) => t.label);
+  const fewestClusters = Math.min(...clusterCounts);
+  const mostClusters = Math.max(...clusterCounts);
   const baseline = scoreLabeller(
     EVAL_ITEMS.map((i) => i.gold),
     EVAL_ITEMS.map((i) => keywordLabel(i.excerpt).topic),
@@ -642,8 +671,17 @@ rate  = k / N × 10,000      interval scaled the same way`}
                 bootstrap, {formatInt(READABILITY_RESAMPLES)} resamples, seed {DEFAULT_SEED}): for
                 the mean grade of a cycle and kind of text, whole speakers with all their documents;
                 for a debate trend (the slope of a least-squares line per decade, and a pointwise
-                band for the fitted line), whole cycles with all their debates. Groups of fewer than
-                five documents or five speakers get a point estimate and no interval.
+                band for the fitted line), whole cycles with all their debates. Cells with fewer
+                than {MIN_GROUP_FOR_INTERVAL} documents or {MIN_CLUSTERS_FOR_INTERVAL} speakers get
+                a point estimate and no interval: with fewer speakers the cluster bootstrap runs
+                narrow (
+                <Link
+                  href="/methods/decisions/dr-008-fewer-readability-intervals-and-speaker-matched-transcripts"
+                  className="inline-link"
+                >
+                  DR-008
+                </Link>
+                ).
               </p>
               <p>
                 The difference is not small. For 2024 written releases ({formatInt(written2024.n)}{" "}
@@ -708,10 +746,9 @@ rate  = k / N × 10,000      interval scaled the same way`}
                 {SAMPLE_META.words[1]} words, {SAMPLE_META.perCycle} per cycle, one per randomly
                 drawn document (seed {SAMPLE_META.seed}), after the quotation rules. The draw is
                 blind to keywords, so it does not favour the dictionary. Gold labels:{" "}
-                {GOLD_META.status === "draft"
-                  ? "a single-annotator draft prepared by the AI coding assistant that built this upgrade, not yet reviewed by a person"
-                  : "reviewed"}
-                ; until reviewed, every score is provisional.
+                {GOLD_METHOD_LABEL[provenance.method]}
+                {goldIsProvisional(provenance) ? ", so every score is provisional" : ""}.{" "}
+                {provenanceNote.text}
               </p>
               <p>
                 <strong>Labellers.</strong> The keyword rules, {KEYWORD_RULES_VERSION}, were written
@@ -767,14 +804,21 @@ rate  = k / N × 10,000      interval scaled the same way`}
                 <strong>Intervals.</strong> Every interval covers sampling variability given the
                 pipeline&apos;s choices (tokeniser, stop words, cleaning, roles). None of them
                 covers uncertainty in those choices. Readability intervals resample speakers or
-                election cycles, but with 9 to 24 clusters they are approximate; the topic-label
-                intervals treat the {EVAL_ITEMS.length} excerpts, one per document, as independent.
+                election cycles, but with {fewestClusters} to {mostClusters} clusters they are
+                approximate; the topic-label intervals treat the {EVAL_ITEMS.length} excerpts, one
+                per document, as independent.
               </li>
               <li>
-                <strong>Topic labels.</strong> A small, single-annotator draft gold set; most topics
-                have one to eight excerpts; one sentence out of context is hard for any coder. The
-                same AI assistant drafted the gold labels and wrote the keyword dictionary, so the
-                gold set is independent of neither labeller.
+                <strong>Topic labels.</strong> A small gold set (
+                {GOLD_METHOD_LABEL[provenance.method]}
+                ); each policy topic has zero to {maxPerTopic} excerpts
+                {missingTopics.length
+                  ? `, and ${quotedList(missingTopics)} ${missingTopics.length === 1 ? "has" : "have"} none, so the evaluation says nothing about ${missingTopics.length === 1 ? "it" : "them"}`
+                  : ""}
+                ; one sentence out of context is hard for any coder.
+                {provenance.method === "blind-relabel"
+                  ? ""
+                  : " The same AI assistant drafted the gold labels and wrote the keyword dictionary, so the gold set is independent of neither labeller until people relabel it blind."}
               </li>
               <li>
                 <strong>Many tests.</strong> Distinctive words tests every indexed word at once;
@@ -816,10 +860,13 @@ rate  = k / N × 10,000      interval scaled the same way`}
               </p>
               <p>
                 <strong>Human in the loop and audit.</strong> You can accept, correct or reject each
-                run; corrections are recorded as edits and never change the scores, which always use
-                the model&apos;s own labels. Every call, failure and simulated run is logged in your
-                browser&apos;s IndexedDB with the prompt, the answer, latency, token use and your
-                decision, viewable and exportable (JSON or CSV) on the{" "}
+                run, and accept or reject any single call later from the log; corrections are
+                recorded as edits and never change the scores, which always use the model&apos;s own
+                labels. Each decision is added to the call&apos;s decision history, so a change of
+                mind never erases the earlier decision, and each record holds the generation
+                settings the request was sent with. Every call, failure and simulated run is logged
+                in your browser&apos;s IndexedDB with the prompt, the answer, latency, token use and
+                your decision, viewable and exportable (JSON or CSV) on the{" "}
                 <Link href="/ai-log" className="inline-link">
                   AI audit log
                 </Link>
@@ -835,6 +882,13 @@ rate  = k / N × 10,000      interval scaled the same way`}
                 <strong>AI in building the site.</strong> The 2026 upgrade was built with an AI
                 coding assistant, which also wrote the keyword dictionary and prepared the draft
                 gold labels (see{" "}
+                <Link
+                  href="/methods/decisions/dr-007-blind-relabel-for-the-gold-set"
+                  className="inline-link"
+                >
+                  DR-007
+                </Link>
+                ,{" "}
                 <Link
                   href="/methods/decisions/dr-004-llm-topic-labels-vs-keyword-rules"
                   className="inline-link"
@@ -885,7 +939,11 @@ rate  = k / N × 10,000      interval scaled the same way`}
                     className="block px-4 py-3.5 transition-colors hover:bg-accent/40"
                   >
                     <span className="kicker">
-                      {d.id} · {d.status} · {d.decided}
+                      {d.id} · {d.status}
+                      {d.amendedBy.length
+                        ? ` · amended by ${d.amendedBy.map((a) => a.id).join(", ")}`
+                        : ""}{" "}
+                      · {d.decided}
                     </span>
                     <span className="mt-1 block font-serif text-[1.05rem]">{d.title}</span>
                     <span className="mt-1 block text-sm text-muted-foreground">{d.decision}</span>

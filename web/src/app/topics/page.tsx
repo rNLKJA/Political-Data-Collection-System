@@ -6,16 +6,27 @@ import { PageIntro, Panel, Section } from "@/components/common/page-intro";
 import { numInterval } from "@/components/topics/format";
 import { TopicHarness, type HarnessItem } from "@/components/topics/topic-harness";
 import { buildSystemPrompt, buildUserMessage, DEFAULT_BATCH_SIZE } from "@/lib/ai/topic-labels";
-import { formatDate, formatInt, formatPercent } from "@/lib/format";
+import { formatDate, formatInt, formatPercent, quotedList } from "@/lib/format";
 import { CODEBOOK, CODING_RULES, topicLabel } from "@/lib/topics/codebook";
-import { EVAL_ITEMS, EXCERPTS_NAMING_CANDIDATE, GOLD_META, SAMPLE_META } from "@/lib/topics/data";
+import {
+  EVAL_ITEMS,
+  EXCERPTS_NAMING_CANDIDATE,
+  GOLD_META,
+  GOLD_METHOD_LABEL,
+  goldIsProvisional,
+  goldProvenanceNote,
+  SAMPLE_META,
+} from "@/lib/topics/data";
 import { scoreLabeller } from "@/lib/topics/evaluation";
 import { KEYWORD_RULES_VERSION, KEYWORDS, keywordLabel } from "@/lib/topics/keyword-rules";
 import { SITE } from "@/lib/site";
 
+const provenance = GOLD_META.provenance;
+const provenanceNote = goldProvenanceNote(provenance);
+
 export const metadata: Metadata = {
   title: "Topic labels: an LLM against keyword rules",
-  description: `Policy-topic labels from a large language model (bring your own key) against a transparent keyword dictionary, on ${EVAL_ITEMS.length} gold-labelled campaign excerpts${GOLD_META.status === "draft" ? " (a draft, single-annotator gold set prepared by an AI assistant and awaiting human review)" : ""}, with Cohen's kappa and bootstrap intervals.`,
+  description: `Policy-topic labels from a large language model (bring your own key) against a transparent keyword dictionary, on ${EVAL_ITEMS.length} gold-labelled campaign excerpts (gold labels: ${GOLD_METHOD_LABEL[provenance.method]}${goldIsProvisional(provenance) ? "; scores provisional" : ""}), with Cohen's kappa and bootstrap intervals.`,
 };
 
 export default function TopicsPage() {
@@ -40,6 +51,8 @@ export default function TopicsPage() {
   }));
   const example = EVAL_ITEMS.slice(0, 3).map((i) => ({ id: i.id, excerpt: i.excerpt }));
   const none = gold.filter((g) => g === "none").length;
+  const missingTopics = goldCounts.filter((t) => t.n === 0).map((t) => t.label);
+  const maxPerTopic = Math.max(...goldCounts.filter((t) => t.id !== "none").map((t) => t.n));
 
   return (
     <>
@@ -54,15 +67,16 @@ export default function TopicsPage() {
       </PageIntro>
 
       <div className="mx-auto max-w-6xl space-y-10 px-4 sm:px-6">
-        {GOLD_META.status === "draft" ? (
-          <Callout title="The gold labels are a first draft">
-            {GOLD_META.annotator} Until they are reviewed, treat every score on this page as
-            provisional. Because the draft came from the same model family as the default labeller,
-            agreement with Claude models may be flattered. The same assistant also wrote the keyword
-            dictionary, so the gold labels are not independent of the baseline either, which could
-            move its scores in either direction.
-          </Callout>
-        ) : null}
+        <Callout title={provenanceNote.title}>
+          {provenanceNote.text} How the gold set was made is recorded in{" "}
+          <Link
+            href="/methods/decisions/dr-007-blind-relabel-for-the-gold-set"
+            className="inline-link"
+          >
+            DR-007
+          </Link>
+          .
+        </Callout>
 
         <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
           <StatTile
@@ -251,8 +265,11 @@ export default function TopicsPage() {
             </table>
           </div>
           <p className="text-xs text-muted-foreground">
-            Per-topic figures rest on very few excerpts (most topics have one to eight), so they
-            describe this set and nothing more.
+            Per-topic figures rest on very few excerpts (zero to {maxPerTopic} per policy topic), so
+            they describe this set and nothing more.
+            {missingTopics.length
+              ? ` ${quotedList(missingTopics)} ${missingTopics.length === 1 ? "has" : "have"} no gold excerpt, so the evaluation says nothing about ${missingTopics.length === 1 ? "it" : "them"}.`
+              : ""}
           </p>
           <details className="rounded-lg border border-border bg-card p-4 text-sm">
             <summary className="cursor-pointer font-medium">
@@ -286,8 +303,8 @@ export default function TopicsPage() {
             {SAMPLE_META.seed}: {SAMPLE_META.perCycle} documents per election cycle, one sentence of{" "}
             {SAMPLE_META.words[0]} to {SAMPLE_META.words[1]} words from each, after the site&apos;s
             quotation rules (no other candidate named, no charged words). Labelled on{" "}
-            {formatDate(GOLD_META.labelledOn)}, status: {GOLD_META.status}. Excerpts are listed in
-            id order and never summarised by speaker or party.
+            {formatDate(GOLD_META.labelledOn)}; gold labels: {GOLD_METHOD_LABEL[provenance.method]}.
+            Excerpts are listed in id order and never summarised by speaker or party.
           </>
         }
       >
@@ -400,6 +417,15 @@ export default function TopicsPage() {
               topic-eval-items.json
             </a>
             . Kappa for the rules: {numInterval(score.kappa)}.
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            For a blind relabel, the{" "}
+            <a href="/topics/blind-relabel.csv" download className="inline-link">
+              coding sheet
+            </a>{" "}
+            holds the {EVAL_ITEMS.length} ids and excerpts only, with empty columns for a topic and
+            a note: no gold label, no keyword label, no source. The codebook and coding rules are
+            the system prompt above.
           </p>
         </details>
       </Section>

@@ -1,11 +1,12 @@
 "use client";
 
-import { Download, RefreshCw, Trash2, TriangleAlert } from "lucide-react";
+import { Check, Download, RefreshCw, Trash2, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { AiGeneratedBadge } from "@/components/ai/ai-badge";
 import { Button } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
 import {
   auditToCsv,
   auditToJson,
@@ -182,7 +183,7 @@ export function AuditLogView() {
         <ol className="space-y-3">
           {entries.slice(0, limit).map((e) => (
             <li key={e.id}>
-              <EntryCard entry={e} />
+              <EntryCard entry={e} onDecided={() => void refresh()} />
             </li>
           ))}
         </ol>
@@ -206,7 +207,16 @@ function Summary({ label, value, note }: { label: string; value: string; note: s
   );
 }
 
-function EntryCard({ entry: e }: { entry: AuditEntry }) {
+const DECISION_WORD: Record<Exclude<HumanDecision, "pending">, string> = {
+  accepted: "Accepted",
+  edited: "Edited",
+  rejected: "Rejected",
+};
+
+const whenText = (iso: string) =>
+  new Date(iso).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "medium" });
+
+function EntryCard({ entry: e, onDecided }: { entry: AuditEntry; onDecided: () => void }) {
   const simulated = e.provider === "mock";
   const swapped = substitutedModel(e.model, e.served_model);
   const meta = e.input.meta as {
@@ -214,13 +224,14 @@ function EntryCard({ entry: e }: { entry: AuditEntry }) {
     batch?: number;
     batches?: number;
     item_ids?: string[];
+    params?: { max_tokens?: number; temperature?: number | null; effort?: string | null } | null;
   };
-  const when = new Date(e.timestamp);
+  const params = meta.params;
   return (
     <article className="rounded-lg border border-border bg-card p-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <time dateTime={e.timestamp} className="tabular font-mono text-xs text-muted-foreground">
-          {when.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "medium" })}
+          {whenText(e.timestamp)}
         </time>
         <span className="text-sm font-medium">{FEATURE_LABEL[e.feature]}</span>
         <span className="font-mono text-xs text-muted-foreground">
@@ -255,6 +266,9 @@ function EntryCard({ entry: e }: { entry: AuditEntry }) {
           : null}
         {e.retries.length ? ` · ${e.retries.length} retried` : null}
         {swapped ? ` · served by ${swapped}` : null}
+        {params?.temperature != null ? ` · temperature ${params.temperature}` : null}
+        {params?.effort ? ` · ${params.effort} effort` : null}
+        {params?.max_tokens ? ` · ceiling ${formatInt(params.max_tokens)} tokens` : null}
       </p>
       {e.error ? <p className="mt-2 text-sm">{e.error.message}</p> : null}
       <details className="mt-3 text-sm">
@@ -273,7 +287,84 @@ function EntryCard({ entry: e }: { entry: AuditEntry }) {
           <Block title="Sent: system prompt" text={e.input.system} />
         </div>
       </details>
+      {e.decision_history.length > 0 ? (
+        <div className="mt-3 text-xs">
+          <p className="kicker">Decision history</p>
+          <ol className="mt-1 space-y-0.5 text-muted-foreground">
+            {e.decision_history.map((h, i) => (
+              <li key={`${h.at}-${i}`}>
+                <span className="text-foreground">{DECISION_WORD[h.decision]}</span>{" "}
+                <time dateTime={h.at}>{whenText(h.at)}</time>
+                {h.note ? ` · ${h.note}` : ""}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+      {isReviewable(e) ? <DecisionControls entry={e} onDecided={onDecided} /> : null}
     </article>
+  );
+}
+
+/**
+ * Accept or reject one call from the log, so a run left undecided on /topics
+ * (a reload, or leaving the page) can still be reviewed. Corrections to single
+ * labels are made on the run itself; a later decision is added to the history
+ * and never erases an earlier one.
+ */
+function DecisionControls({ entry, onDecided }: { entry: AuditEntry; onDecided: () => void }) {
+  const id = useId();
+  const [note, setNote] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const pending = entry.decision === "pending";
+
+  async function decide(decision: "accepted" | "rejected") {
+    try {
+      await getAuditStore().decide(entry.id, { decision, decision_note: note });
+      setNote("");
+      setProblem(null);
+      onDecided();
+    } catch {
+      setProblem("The decision could not be saved: the log is not available in this browser.");
+    }
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-border/70 pt-3">
+      <div className="flex min-w-[min(100%,14rem)] flex-1 flex-col gap-1">
+        <label htmlFor={`${id}-note`} className="text-xs text-muted-foreground">
+          {pending ? "Your decision on this call" : "Change your decision"} (note optional)
+        </label>
+        <input
+          id={`${id}-note`}
+          value={note}
+          maxLength={500}
+          onChange={(ev) => setNote(ev.target.value)}
+          placeholder="Why, for the record"
+          className={cn(controlClass, "h-8 text-xs")}
+        />
+      </div>
+      <Button
+        size="sm"
+        onClick={() => void decide("accepted")}
+        aria-pressed={entry.decision === "accepted"}
+      >
+        <Check aria-hidden /> Accept
+      </Button>
+      <Button
+        size="sm"
+        variant="destructive"
+        onClick={() => void decide("rejected")}
+        aria-pressed={entry.decision === "rejected"}
+      >
+        <X aria-hidden /> Reject
+      </Button>
+      {problem ? (
+        <p role="alert" className="w-full text-xs text-destructive">
+          {problem}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

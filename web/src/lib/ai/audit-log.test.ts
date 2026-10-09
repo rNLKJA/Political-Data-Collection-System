@@ -11,6 +11,8 @@ import {
   createMemoryAuditStore,
   isReviewable,
   newAuditEntry,
+  newestFirst,
+  normaliseEntry,
   redactSecrets,
   substitutedModel,
   type AuditEntry,
@@ -92,6 +94,71 @@ describe("audit entries", () => {
     expect(rejected.edited_output).toBeNull();
     expect(rejected.decision_note).toBeNull();
   });
+
+  it("keeps every decision in the history, so a later one never erases an earlier one", () => {
+    const e = newAuditEntry(fields(), KEY);
+    expect(e.decision_history).toEqual([]);
+    const accepted = applyDecision(
+      e,
+      { decision: "accepted", decision_note: "looks right" },
+      new Date("2026-10-06T01:00:00.000Z"),
+    );
+    const rejected = applyDecision(
+      accepted,
+      { decision: "rejected" },
+      new Date("2026-10-06T02:00:00.000Z"),
+    );
+    expect(rejected.decision).toBe("rejected");
+    expect(rejected.decision_history).toEqual([
+      {
+        decision: "accepted",
+        edited_output: null,
+        note: "looks right",
+        at: "2026-10-06T01:00:00.000Z",
+      },
+      { decision: "rejected", edited_output: null, note: null, at: "2026-10-06T02:00:00.000Z" },
+    ]);
+    // the input record is not mutated
+    expect(accepted.decision_history).toHaveLength(1);
+  });
+
+  it("gives records written before the history existed a history of their own decision", () => {
+    const legacy = { ...newAuditEntry(fields(), KEY) } as Partial<AuditEntry>;
+    delete legacy.decision_history;
+    const pending = normaliseEntry(legacy as AuditEntry);
+    expect(pending.decision_history).toEqual([]);
+    const decided = normaliseEntry({
+      ...(legacy as AuditEntry),
+      decision: "accepted",
+      decided_at: "2026-10-06T00:00:00.000Z",
+    });
+    expect(decided.decision_history).toEqual([
+      { decision: "accepted", edited_output: null, note: null, at: "2026-10-06T00:00:00.000Z" },
+    ]);
+  });
+
+  it("orders calls logged in the same millisecond by batch, newest batch first", () => {
+    const at = "2026-10-06T00:00:00.000Z";
+    const batch = (run: string, n: number) =>
+      newAuditEntry(
+        fields({
+          timestamp: at,
+          input: { system: "s", user: "u", meta: { run_id: run, batch: n } },
+        }),
+        KEY,
+      );
+    const entries = [batch("r1", 2), batch("r1", 4), batch("r1", 1), batch("r1", 3)];
+    for (let k = 0; k < 5; k++) {
+      const shuffled = [...entries].sort(() => (k % 2 ? 1 : -1));
+      expect(shuffled.sort(newestFirst).map((e) => e.input.meta.batch)).toEqual([4, 3, 2, 1]);
+    }
+    const later = newAuditEntry(fields({ timestamp: "2026-10-06T00:00:01.000Z" }), KEY);
+    expect([...entries, later].sort(newestFirst)[0].id).toBe(later.id);
+    // different runs in the same millisecond stay grouped by run
+    const other = [batch("r2", 1), batch("r2", 2)];
+    const runs = [...entries, ...other].sort(newestFirst).map((e) => e.input.meta.run_id);
+    expect(runs).toEqual(["r2", "r2", "r1", "r1", "r1", "r1"]);
+  });
 });
 
 async function exercise(store: AuditStore) {
@@ -103,6 +170,12 @@ async function exercise(store: AuditStore) {
   const decided = await store.decide(a.id, { decision: "accepted" });
   expect(decided?.decision).toBe("accepted");
   expect((await store.get(a.id))?.decision).toBe("accepted");
+  await store.decide(a.id, { decision: "rejected", decision_note: "changed my mind" });
+  const trail = (await store.get(a.id))?.decision_history.map((h) => [h.decision, h.note]);
+  expect(trail).toEqual([
+    ["accepted", null],
+    ["rejected", "changed my mind"],
+  ]);
   expect(await store.decide("missing", { decision: "rejected" })).toBeUndefined();
   await store.clear();
   expect(await store.list()).toEqual([]);

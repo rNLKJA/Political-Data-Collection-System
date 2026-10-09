@@ -17,12 +17,18 @@ import {
   buildSystemPrompt,
   buildUserMessage,
   decisionPatches,
+  describeDecision,
   estimateRunTokens,
   labelSchema,
   labelsForBatch,
   NO_ANSWER,
   runTopicLabelling,
+  sha256Hex,
+  thinksBeforeAnswering,
 } from "./topic-labels";
+import { RUN_CSV_COLUMNS, runExportRows, runFileName } from "./topic-export";
+import { toCsv } from "@/lib/csv";
+import type { AuditStore } from "./audit-log";
 import { comparePaired, scoreLabeller } from "@/lib/topics/evaluation";
 import type { TopicId } from "@/lib/topics/codebook";
 
@@ -61,11 +67,16 @@ describe("prompt", () => {
     expect(schema.properties.labels.items.properties.topic.enum).toEqual([...TOPIC_IDS]);
   });
 
-  it("estimates tokens before a run", () => {
+  it("estimates tokens before a run, with a ceiling for models that think", () => {
     const t = estimateRunTokens(items, 5);
     expect(t.input).toBeGreaterThan(1000);
     expect(t.output).toBe(items.length * 18);
+    expect(t.outputCeiling).toBe(0);
+    expect(estimateRunTokens(items, 5, 16_000).outputCeiling).toBe(3 * 16_000);
     expect(batches(items, 5).map((b) => b.length)).toEqual([5, 5, 2]);
+    expect(thinksBeforeAnswering("anthropic", "claude-haiku-4-5")).toBe(false);
+    expect(thinksBeforeAnswering("anthropic", "claude-sonnet-5-5")).toBe(true);
+    expect(thinksBeforeAnswering("openai", "gpt-5-mini")).toBe(true);
   });
 });
 
@@ -120,6 +131,61 @@ describe("running a labelling job", () => {
     expect(res.entryOf[ids[11]]).toBe(res.entryIds[1]);
     const meta = log.find((e) => e.id === res.entryIds[0])!.input.meta;
     expect(meta).toMatchObject({ run_id: "run-1", batch: 1, item_ids: ids.slice(0, 10) });
+    // the generation settings actually sent, and which output schema the answer was held to
+    expect(meta.params).toEqual({ max_tokens: 2048, temperature: 0, effort: null });
+    expect(meta.output_schema_sha256).toBe(await sha256Hex(labelSchema(ids.slice(0, 10))));
+    expect(meta.output_schema_sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect([calls[0].body.max_tokens, calls[0].body.temperature]).toEqual([2048, 0]);
+    expect(res.logWriteFailures).toBe(0);
+  });
+
+  it("records Sonnet's effort and OpenAI's ceiling in the log", async () => {
+    const ids = items.slice(0, 2).map((i) => i.id);
+    const store = createMemoryAuditStore();
+    await runTopicLabelling(items.slice(0, 2), {
+      runId: "run-s",
+      provider: "anthropic",
+      model: "claude-sonnet-5-5",
+      apiKey: KEY,
+      seed: 1,
+      fetchImpl: mockFetch([jsonResponse(200, anthropicMessage(answer(ids)))]).impl,
+      store,
+      sleep: noSleep,
+    });
+    await runTopicLabelling(items.slice(0, 2), {
+      runId: "run-o",
+      provider: "openai",
+      model: "gpt-5-mini",
+      apiKey: "sk-openai-TEST-KEY-123456789",
+      seed: 1,
+      fetchImpl: mockFetch([jsonResponse(200, openaiCompletion(answer(ids)))]).impl,
+      store,
+      sleep: noSleep,
+    });
+    const params = Object.fromEntries(
+      (await store.list()).map((e) => [e.input.meta.run_id, e.input.meta.params]),
+    );
+    expect(params["run-s"]).toEqual({ max_tokens: 16_000, temperature: null, effort: "low" });
+    expect(params["run-o"]).toEqual({ max_tokens: 16_000, temperature: null, effort: null });
+  });
+
+  it("counts calls the log could not keep, so the page can warn", async () => {
+    const broken: AuditStore = {
+      ...createMemoryAuditStore(),
+      add: () => Promise.reject(new Error("no IndexedDB")),
+    };
+    const res = await runTopicLabelling(items, {
+      runId: "run-nolog",
+      provider: "mock",
+      model: MOCK_MODEL_ID,
+      apiKey: "",
+      seed: 3,
+      store: broken,
+      goldForMock: Object.fromEntries(EVAL_ITEMS.map((i) => [i.id, i.gold])),
+    });
+    expect(res.entryIds).toHaveLength(2);
+    expect(res.logWriteFailures).toBe(2);
+    expect(res.scoredIds).toHaveLength(items.length);
   });
 
   it("works with OpenAI's JSON-schema output too", async () => {
@@ -267,6 +333,30 @@ describe("running a labelling job", () => {
     expect(decisionPatches(res, ids, {}, "rejected")).toEqual([
       { entryId: res.entryIds[1], patch: { decision: "rejected" } },
     ]);
+    expect(describeDecision(patches, 1)).toBe(
+      "Recorded in the AI audit log: 1 call as edited. 1 call failed and stays pending, with nothing to review.",
+    );
+  });
+
+  it("says in words that 'accept with corrections' accepts the uncorrected calls", () => {
+    const res = {
+      reviewableEntryIds: ["e1", "e2", "e3", "e4"],
+      entryOf: { a: "e1", b: "e2", c: "e3", d: "e4" },
+      labels: { a: "health", b: "none", c: "none", d: "energy" } as const,
+    };
+    const patches = decisionPatches(res, ["a", "b", "c", "d"], { b: "labour" }, "edited");
+    expect(patches.map((p) => p.patch.decision)).toEqual([
+      "accepted",
+      "edited",
+      "accepted",
+      "accepted",
+    ]);
+    expect(describeDecision(patches, 0)).toBe(
+      "Recorded in the AI audit log: 1 call as edited, 3 as accepted.",
+    );
+    expect(describeDecision(decisionPatches(res, ["a"], {}, "rejected"), 0)).toBe(
+      "Recorded in the AI audit log: 4 calls as rejected.",
+    );
   });
 
   it("excludes everything after the visitor presses Stop", async () => {
@@ -341,6 +431,63 @@ describe("running a labelling job", () => {
     expect(res.reviewableEntryIds).toEqual(res.entryIds);
     const log = await store.list();
     expect(log.every((e) => e.provider === "mock" && e.model === MOCK_MODEL_ID)).toBe(true);
-    expect(log[0].input.meta).toMatchObject({ simulated: true });
+    expect(log[0].input.meta).toMatchObject({ simulated: true, params: null });
+  });
+});
+
+describe("run exports", () => {
+  const sample = EVAL_ITEMS.slice(0, 3).map((i) => ({
+    id: i.id,
+    excerpt: i.excerpt,
+    url: i.url,
+    gold: i.gold,
+    rules: "none",
+  }));
+  const run = (simulated: boolean) => ({
+    runId: "run-x",
+    simulated,
+    provider: simulated ? "mock" : "anthropic",
+    model: simulated ? MOCK_MODEL_ID : "claude-haiku-4-5",
+    servedModel: simulated ? MOCK_MODEL_ID : "claude-haiku-4-5-20251001",
+    seed: 42,
+    items: sample,
+    scoredIds: new Set([sample[0].id, sample[1].id]),
+    labels: { [sample[0].id]: sample[0].gold, [sample[1].id]: NO_ANSWER } as Record<string, never>,
+    edits: { [sample[1].id]: "health" },
+  });
+
+  it("marks every CSV row with who labelled it, the model, the run and the seed", () => {
+    const csv = toCsv(runExportRows(run(false)), RUN_CSV_COLUMNS);
+    const [header, first] = csv.split("\r\n");
+    for (const col of [
+      "run_id",
+      "labeller",
+      "ai_generated",
+      "provider",
+      "model",
+      "served_model",
+      "sample_seed",
+    ]) {
+      expect(header.split(",")).toContain(col);
+    }
+    expect(first).toContain("AI-generated: anthropic/claude-haiku-4-5");
+    expect(first.startsWith("run-x,")).toBe(true);
+    const rows = runExportRows(run(false));
+    expect(rows.map((r) => r.ai_generated)).toEqual([true, true, true]);
+    expect(rows.map((r) => r.sample_seed)).toEqual([42, 42, 42]);
+    expect(rows[1]).toMatchObject({ model_label: NO_ANSWER, human_correction: "health" });
+    expect(rows[2]).toMatchObject({ scored: false, model_label: "", model_matches_gold: "" });
+  });
+
+  it("never lets a simulated run pass for AI output", () => {
+    const rows = runExportRows(run(true));
+    expect(rows.every((r) => r.labeller === "simulated (no model called)")).toBe(true);
+    expect(rows.every((r) => r.ai_generated === false)).toBe(true);
+    expect(runFileName(true, "2026-10-10T00-00-00", "csv")).toBe(
+      "topic-labels-simulated-2026-10-10T00-00-00.csv",
+    );
+    expect(runFileName(false, "2026-10-10T00-00-00", "json")).toBe(
+      "topic-labels-2026-10-10T00-00-00.json",
+    );
   });
 });

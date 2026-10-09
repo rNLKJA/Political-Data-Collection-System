@@ -5,6 +5,7 @@ import {
   debateMeansByCycle,
   debateTrend,
   gradeByCycleAndRegister,
+  sameWords,
   withinSpeakerGap,
   type DebateRow,
   type DocRow,
@@ -49,9 +50,14 @@ export interface TwinPair {
  * debates share a date with the main debate but are different events). The
  * same candidate's words, punctuated by two different transcribers, show how
  * much the transcript alone moves the grade.
+ *
+ * A speaker is compared only when the two transcripts also give them almost
+ * the same words (within 2%). When they do not, the transcripts attribute
+ * different turns to that speaker, and the grade difference would mix
+ * attribution with punctuation; such speakers are listed apart, not compared.
  */
-export function twinTranscripts(): TwinPair[] {
-  return all<TwinPair>(
+export function twinTranscripts(): { pairs: TwinPair[]; excluded: TwinPair[] } {
+  const rows = all<TwinPair>(
     `SELECT da.date, da.title, da.url AS urlA, db.url AS urlB, sa.display AS speaker,
             sa.words AS wordsA, sb.words AS wordsB, sa.fk_grade AS gradeA, sb.fk_grade AS gradeB
        FROM debates da
@@ -63,6 +69,7 @@ export function twinTranscripts(): TwinPair[] {
       WHERE sa.fk_grade IS NOT NULL AND sb.fk_grade IS NOT NULL
       ORDER BY da.date, sa.words DESC`,
   );
+  return { pairs: rows.filter(sameWords), excluded: rows.filter((t) => !sameWords(t)) };
 }
 
 let cache: ReturnType<typeof compute> | undefined;
@@ -72,13 +79,15 @@ function compute() {
   const debates = debateGrades();
   const general = debates.filter((d) => d.kind !== "primary");
   const primary = debates.filter((d) => d.kind === "primary");
+  const twins = twinTranscripts();
   return {
     docs: { n: docs.length, cells: gradeByCycleAndRegister(docs, CYCLES) },
     gap: withinSpeakerGap(docs),
     debates,
     general: { trend: debateTrend(general, TREND_YEARS), byCycle: debateMeansByCycle(general) },
     primary: { trend: debateTrend(primary, TREND_YEARS), byCycle: debateMeansByCycle(primary) },
-    twins: twinTranscripts(),
+    twins: twins.pairs,
+    twinsExcluded: twins.excluded,
   };
 }
 

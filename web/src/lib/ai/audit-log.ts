@@ -47,11 +47,25 @@ export type AuditEntry = {
   attempts: number | null;
   /** the failures that were retried (rate limit, overload, server error), in order */
   retries: { kind: string; status: number | null }[];
+  /** the latest human decision (the full trail is in `decision_history`) */
   decision: HumanDecision;
-  /** the human's corrected output, when the decision is "edited" */
+  /** the human's corrected output, when the latest decision is "edited" */
   edited_output: unknown;
   decision_note: string | null;
   decided_at: string | null;
+  /**
+   * every decision recorded on this call, oldest first. A later decision never
+   * overwrites an earlier one here, so accepting and then rejecting leaves both.
+   */
+  decision_history: DecisionEvent[];
+};
+
+export type DecisionEvent = {
+  decision: Exclude<HumanDecision, "pending">;
+  edited_output: unknown;
+  note: string | null;
+  /** ISO 8601 */
+  at: string;
 };
 
 export const AUDIT_COLUMNS = [
@@ -73,6 +87,7 @@ export const AUDIT_COLUMNS = [
   "edited_output",
   "decision_note",
   "decided_at",
+  "decision_history",
 ] as const satisfies readonly (keyof AuditEntry)[];
 
 /** Replace every occurrence of each secret in any string inside `value`. */
@@ -110,6 +125,7 @@ export type NewAuditEntry = Omit<
   | "edited_output"
   | "decision_note"
   | "decided_at"
+  | "decision_history"
 > &
   Partial<Pick<AuditEntry, "timestamp" | "served_model" | "attempts" | "retries">>;
 
@@ -134,6 +150,7 @@ export function newAuditEntry(fields: NewAuditEntry, apiKey: string): AuditEntry
     edited_output: null,
     decision_note: null,
     decided_at: null,
+    decision_history: [],
   };
   return redactSecrets(entry, [apiKey]);
 }
@@ -164,18 +181,47 @@ export type DecisionPatch = {
   decision_note?: string | null;
 };
 
+/**
+ * Record a decision. The latest decision is kept at the top level for the
+ * table view; every decision, this one included, is appended to
+ * `decision_history`, so an earlier decision is never lost.
+ */
 export function applyDecision(
   entry: AuditEntry,
   patch: DecisionPatch,
   at = new Date(),
 ): AuditEntry {
-  return {
-    ...entry,
+  const event: DecisionEvent = {
     decision: patch.decision,
     edited_output: patch.decision === "edited" ? (patch.edited_output ?? null) : null,
-    decision_note: patch.decision_note?.trim() ? patch.decision_note.trim() : null,
-    decided_at: at.toISOString(),
+    note: patch.decision_note?.trim() ? patch.decision_note.trim() : null,
+    at: at.toISOString(),
   };
+  return {
+    ...entry,
+    decision: event.decision,
+    edited_output: event.edited_output,
+    decision_note: event.note,
+    decided_at: event.at,
+    decision_history: [...(entry.decision_history ?? []), event],
+  };
+}
+
+/** Entries written before `decision_history` existed get an empty trail (or their one decision). */
+export function normaliseEntry(entry: AuditEntry): AuditEntry {
+  if (Array.isArray(entry.decision_history)) return entry;
+  const history: DecisionEvent[] =
+    entry.decision !== "pending" && entry.decided_at
+      ? [
+          {
+            decision: entry.decision,
+            edited_output: entry.edited_output ?? null,
+            note: entry.decision_note ?? null,
+            at: entry.decided_at,
+          },
+        ]
+      : [];
+  return { ...entry, decision_history: history };
 }
 
 export interface AuditStore {
@@ -187,8 +233,30 @@ export interface AuditStore {
   clear(): Promise<void>;
 }
 
-function newestFirst(a: AuditEntry, b: AuditEntry) {
-  return b.timestamp.localeCompare(a.timestamp) || b.id.localeCompare(a.id);
+function metaOf(e: AuditEntry): { run_id?: unknown; batch?: unknown } {
+  return (e.input?.meta ?? {}) as { run_id?: unknown; batch?: unknown };
+}
+
+/**
+ * Newest first. Calls logged in the same millisecond (the simulated demo logs
+ * a whole run at once) keep their order within a run: later batches first,
+ * then by run id, and only then by the random entry id.
+ */
+export function newestFirst(a: AuditEntry, b: AuditEntry): number {
+  const byTime = b.timestamp.localeCompare(a.timestamp);
+  if (byTime) return byTime;
+  const ma = metaOf(a);
+  const mb = metaOf(b);
+  const runA = typeof ma.run_id === "string" ? ma.run_id : "";
+  const runB = typeof mb.run_id === "string" ? mb.run_id : "";
+  if (runA === runB) {
+    const batchA = typeof ma.batch === "number" ? ma.batch : 0;
+    const batchB = typeof mb.batch === "number" ? mb.batch : 0;
+    if (batchA !== batchB) return batchB - batchA;
+  } else {
+    return runB.localeCompare(runA);
+  }
+  return b.id.localeCompare(a.id);
 }
 
 export function createMemoryAuditStore(initial: AuditEntry[] = []): AuditStore {
@@ -198,15 +266,16 @@ export function createMemoryAuditStore(initial: AuditEntry[] = []): AuditStore {
       rows.set(entry.id, entry);
     },
     async list() {
-      return [...rows.values()].sort(newestFirst);
+      return [...rows.values()].map(normaliseEntry).sort(newestFirst);
     },
     async get(id) {
-      return rows.get(id);
+      const e = rows.get(id);
+      return e && normaliseEntry(e);
     },
     async decide(id, patch) {
       const e = rows.get(id);
       if (!e) return undefined;
-      const next = applyDecision(e, patch);
+      const next = applyDecision(normaliseEntry(e), patch);
       rows.set(id, next);
       return next;
     },
@@ -260,11 +329,12 @@ export function createIndexedDbAuditStore(factory?: IDBFactory, dbName = DB_NAME
     async list() {
       const tx = (await db()).transaction(STORE, "readonly");
       const all = (await promisify(tx.objectStore(STORE).getAll())) as AuditEntry[];
-      return all.sort(newestFirst);
+      return all.map(normaliseEntry).sort(newestFirst);
     },
     async get(id) {
       const tx = (await db()).transaction(STORE, "readonly");
-      return (await promisify(tx.objectStore(STORE).get(id))) as AuditEntry | undefined;
+      const e = (await promisify(tx.objectStore(STORE).get(id))) as AuditEntry | undefined;
+      return e && normaliseEntry(e);
     },
     async decide(id, patch) {
       const tx = (await db()).transaction(STORE, "readwrite");
@@ -274,7 +344,7 @@ export function createIndexedDbAuditStore(factory?: IDBFactory, dbName = DB_NAME
         await done(tx);
         return undefined;
       }
-      const next = applyDecision(e, patch);
+      const next = applyDecision(normaliseEntry(e), patch);
       store.put(next);
       await done(tx);
       return next;

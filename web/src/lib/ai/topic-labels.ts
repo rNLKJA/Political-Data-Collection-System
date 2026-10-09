@@ -27,7 +27,7 @@ import type { JsonSchema } from "./adapters";
 import { newAuditEntry, type AuditStore, type DecisionPatch } from "./audit-log";
 import { completeJson } from "./client";
 import { AiError, errorFromThrown } from "./errors";
-import type { ProviderId } from "./providers";
+import { modelOption, type ProviderId } from "./providers";
 
 export const PROMPT_VERSION = "topic-labels-v1";
 export const DEFAULT_BATCH_SIZE = 10;
@@ -109,6 +109,29 @@ export function labelsForBatch(
   return out;
 }
 
+/**
+ * SHA-256 of a JSON value, as hex, so the audit log can show which output
+ * schema a call was held to without storing it in every record. Null where the
+ * browser offers no Web Crypto (an insecure origin).
+ */
+export async function sha256Hex(value: unknown): Promise<string | null> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return null;
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  const digest = await subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** The generation settings a real request is sent with (see `anthropicBody` / `openaiBody`). */
+export function generationParams(provider: ProviderId, model: string) {
+  const m = modelOption(provider, model);
+  return {
+    max_tokens: m.maxTokens,
+    temperature: m.temperature ?? null,
+    effort: m.effort ?? null,
+  };
+}
+
 export function batches<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
@@ -159,6 +182,8 @@ export interface RunResult {
   usage: { inputTokens: number; outputTokens: number };
   failures: Array<{ batch: number; kind: string; message: string }>;
   stopped: AiError | null;
+  /** calls whose audit record could not be written (no IndexedDB, storage full) */
+  logWriteFailures: number;
 }
 
 export async function runTopicLabelling(
@@ -178,6 +203,7 @@ export async function runTopicLabelling(
     usage: { inputTokens: 0, outputTokens: 0 },
     failures: [],
     stopped: null,
+    logWriteFailures: 0,
   };
   let done = 0;
   const scored = new Set<string>();
@@ -186,6 +212,7 @@ export async function runTopicLabelling(
     let reviewable = false;
     const user = buildUserMessage(batch);
     const ids = batch.map((x) => x.id);
+    const schema = labelSchema(ids);
     const meta = {
       run_id: cfg.runId,
       batch: b + 1,
@@ -193,6 +220,9 @@ export async function runTopicLabelling(
       item_ids: ids,
       prompt_version: PROMPT_VERSION,
       sample_seed: cfg.seed,
+      // what the request was sent with, so the call can be reproduced and audited
+      params: cfg.provider === "mock" ? null : generationParams(cfg.provider, cfg.model),
+      output_schema_sha256: await sha256Hex(schema),
     };
     let entry;
     if (cfg.provider === "mock") {
@@ -231,7 +261,7 @@ export async function runTopicLabelling(
           system,
           user,
           schemaName: "topic_labels",
-          schema: labelSchema(ids),
+          schema,
           validator: labelValidator,
           signal: cfg.signal,
           fetchImpl: cfg.fetchImpl,
@@ -300,8 +330,9 @@ export async function runTopicLabelling(
     try {
       await cfg.store.add(entry);
     } catch {
-      // The log could not be written (private mode, storage full); the run continues
-      // and the page says the log is unavailable.
+      // The log could not be written (private mode, storage full). The run continues,
+      // and the count tells the page to warn that these calls are not in the log.
+      result.logWriteFailures += 1;
     }
     result.entryIds.push(entry.id);
     if (reviewable) result.reviewableEntryIds.push(entry.id);
@@ -324,8 +355,10 @@ export type RunDecision = "accepted" | "edited" | "rejected";
 /**
  * The audit-log updates for a person's decision on a run. Only calls that
  * returned a usable answer can be accepted, corrected or rejected; failed
- * calls stay "pending" (nothing came back to review). "edited" records the
- * corrections on each call that has one and marks the rest accepted.
+ * calls stay "pending" (nothing came back to review). "edited" means "accept
+ * with corrections": it records the corrections on each call that has one and
+ * marks the other answered calls accepted, and the page says so in those words
+ * (see `describeDecision`).
  */
 export function decisionPatches(
   result: Pick<RunResult, "reviewableEntryIds" | "entryOf" | "labels">,
@@ -350,15 +383,50 @@ export function decisionPatches(
   });
 }
 
-/** Rough input and output tokens for a run, for the cost estimate shown before it starts. */
+/** What a set of patches records, in words, so "accepted" is never implied silently. */
+export function describeDecision(
+  patches: ReadonlyArray<{ patch: DecisionPatch }>,
+  failedCalls: number,
+): string {
+  const count = (d: DecisionPatch["decision"]) =>
+    patches.filter((p) => p.patch.decision === d).length;
+  const calls = (n: number) => `${n} call${n === 1 ? "" : "s"}`;
+  const parts = (["edited", "accepted", "rejected"] as const)
+    .map((d) => ({ d, n: count(d) }))
+    .filter((x) => x.n > 0)
+    .map((x, i) => `${i === 0 ? calls(x.n) : x.n} as ${x.d}`);
+  const recorded = parts.length
+    ? `Recorded in the AI audit log: ${parts.join(", ")}.`
+    : "Nothing to record.";
+  const pending = failedCalls
+    ? ` ${calls(failedCalls)} failed and ${failedCalls === 1 ? "stays" : "stay"} pending, with nothing to review.`
+    : "";
+  return recorded + pending;
+}
+
+/**
+ * Rough tokens for a run, for the cost estimate shown before it starts: input
+ * from the prompt length, output for the labels themselves. Models that think
+ * or reason before answering (an `effort` setting, or OpenAI reasoning models)
+ * bill those tokens as output too, which this estimate cannot know in advance;
+ * `outputCeiling` is the most a run could generate (every request using its
+ * full response ceiling).
+ */
 export function estimateRunTokens(
   items: readonly ExcerptForModel[],
   batchSize = DEFAULT_BATCH_SIZE,
+  maxTokensPerRequest = 0,
 ) {
   const system = buildSystemPrompt();
   let input = 0;
-  for (const batch of batches(items, batchSize)) {
+  const groups = batches(items, batchSize);
+  for (const batch of groups) {
     input += Math.ceil((system.length + buildUserMessage(batch).length) / 4);
   }
-  return { input, output: items.length * 18 };
+  return { input, output: items.length * 18, outputCeiling: groups.length * maxTokensPerRequest };
+}
+
+/** Whether a model spends extra (billed) output tokens thinking before it answers. */
+export function thinksBeforeAnswering(provider: ProviderId, model: string): boolean {
+  return provider === "openai" || modelOption(provider, model).effort !== undefined;
 }

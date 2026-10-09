@@ -126,6 +126,7 @@ export default function ReadabilityPage() {
   ];
 
   const twins = r.twins;
+  const twinsExcluded = r.twinsExcluded;
   const twinDiffs = twins.map((t) => Math.abs(t.gradeA - t.gradeB));
   const maxTwin = twins.reduce(
     (a, t) => (Math.abs(t.gradeA - t.gradeB) > Math.abs(a.gradeA - a.gradeB) ? t : a),
@@ -308,7 +309,7 @@ export default function ReadabilityPage() {
         kicker="A natural experiment"
         title="Same debate, two transcripts"
         className="mt-16"
-        description={`The archive holds two transcripts of ${twinEvents.length} events from January 2000, with almost identical word counts. Same speakers, same words; only the transcription differs.`}
+        description={`The archive holds two transcripts of ${twinEvents.length} events from January 2000, with almost identical word counts. Each speaker below has within 2% of the same number of words in both, so the difference comes mainly from how the two transcribers punctuated the same speech.`}
       >
         {/* Phones: one card per speaker. */}
         <ul
@@ -403,7 +404,18 @@ export default function ReadabilityPage() {
           </table>
         </div>
         <p className="mt-3 text-sm text-muted-foreground">
-          Eight speakers from two events is too few for an interval; the table is shown as it is.
+          {twins.length} speakers from {twinEvents.length} events is too few for an interval; the
+          table is shown as it is.
+          {twinsExcluded.length
+            ? ` Left out: ${twinsExcluded
+                .map(
+                  (t) =>
+                    `${t.speaker} on ${formatDate(t.date)} (${formatInt(t.wordsA)} against ${formatInt(t.wordsB)} words)`,
+                )
+                .join(
+                  "; ",
+                )}. The two transcripts attribute different turns to ${twinsExcluded.length === 1 ? "this speaker" : "these speakers"}, so a grade difference would mix who said what with how it was punctuated.`
+            : ""}
         </p>
       </Section>
 

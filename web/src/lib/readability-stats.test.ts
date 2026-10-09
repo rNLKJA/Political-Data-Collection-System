@@ -13,6 +13,8 @@ import {
   debateTrend,
   fractional,
   gradeByCycleAndRegister,
+  MIN_CLUSTERS_FOR_INTERVAL,
+  sameWords,
   withinSpeakerGap,
   type DebateRow,
   type DocRow,
@@ -126,5 +128,27 @@ describe("readability summaries", () => {
   it("places dates within the year", () => {
     expect(fractional("1960-01-01")).toBe(1960);
     expect(fractional("2024-12-31")).toBeCloseTo(2024 + 365 / 365.25, 12);
+  });
+});
+
+describe("intervals and twin transcripts (DR-008)", () => {
+  it("gives no document cell an interval from fewer than ten speakers", () => {
+    const cells = gradeByCycleAndRegister(docs, CYCLES);
+    expect(MIN_CLUSTERS_FOR_INTERVAL).toBe(10);
+    for (const c of cells) {
+      if (c.speakers < MIN_CLUSTERS_FOR_INTERVAL) expect(c.grade).toBeNull();
+      else expect(c.grade?.clusters).toBe(c.speakers);
+    }
+    const addresses2024 = cells.find((c) => c.cycle === 2024 && c.register === "address")!;
+    expect([addresses2024.n, addresses2024.speakers, addresses2024.grade]).toEqual([9, 6, null]);
+  });
+
+  it("compares a speaker across two transcripts only when the words match within 2%", () => {
+    expect(sameWords({ wordsA: 2353, wordsB: 2346 })).toBe(true);
+    expect(sameWords({ wordsA: 1949, wordsB: 1923 })).toBe(true);
+    // McCain, 10 January 2000: the transcripts attribute different turns to him
+    expect(sameWords({ wordsA: 1930, wordsB: 2157 })).toBe(false);
+    expect(sameWords({ wordsA: 100, wordsB: 102 })).toBe(true);
+    expect(sameWords({ wordsA: 100, wordsB: 103 })).toBe(false);
   });
 });

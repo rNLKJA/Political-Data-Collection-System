@@ -11,14 +11,17 @@ import { Button } from "@/components/ui/button";
 import { controlClass, Field, Select } from "@/components/ui/field";
 import { getAuditStore, substitutedModel } from "@/lib/ai/audit-log";
 import { describeAiError } from "@/lib/ai/errors";
-import { estimateCostUsd, PROVIDERS } from "@/lib/ai/providers";
+import { estimateCostUsd, modelOption, PROVIDERS } from "@/lib/ai/providers";
 import { activeKey, activeModel } from "@/lib/ai/settings";
+import { RUN_CSV_COLUMNS, runExportRows, runFileName, runLabeller } from "@/lib/ai/topic-export";
 import {
   decisionPatches,
   DEFAULT_BATCH_SIZE,
+  describeDecision,
   estimateRunTokens,
   NO_ANSWER,
   runTopicLabelling,
+  thinksBeforeAnswering,
   type AiLabel,
   type RunResult,
 } from "@/lib/ai/topic-labels";
@@ -93,8 +96,12 @@ export function TopicHarness({ items }: { items: HarnessItem[] }) {
   );
   const provider = settings.provider;
   const model = activeModel(settings);
-  const tokens = estimateRunTokens(sample, DEFAULT_BATCH_SIZE);
+  const maxTokens = modelOption(provider, model).maxTokens;
+  const tokens = estimateRunTokens(sample, DEFAULT_BATCH_SIZE, maxTokens);
   const cost = estimateCostUsd(provider, model, tokens.input, tokens.output);
+  const thinks = thinksBeforeAnswering(provider, model);
+  const ceilingCost = estimateCostUsd(provider, model, tokens.input, tokens.outputCeiling);
+  const usd = (v: number) => `US$${v.toFixed(v < 0.01 ? 4 : v < 1 ? 3 : 2)}`;
   const calls = Math.ceil(sample.length / DEFAULT_BATCH_SIZE);
   const running = progress !== null;
 
@@ -105,6 +112,17 @@ export function TopicHarness({ items }: { items: HarnessItem[] }) {
     setEdits({});
     setDecision("pending");
     setRun(null);
+    if (!simulated) {
+      // Every real call must be logged: without a working audit log there is no real run.
+      try {
+        await getAuditStore().list();
+      } catch {
+        setError(
+          "This browser cannot keep the AI audit log (IndexedDB is unavailable, for example in some private modes), and a run with your key is only offered when every call can be logged. The simulated demo still works.",
+        );
+        return;
+      }
+    }
     const controller = new AbortController();
     abort.current = controller;
     const runId = uuid();
@@ -176,9 +194,7 @@ export function TopicHarness({ items }: { items: HarnessItem[] }) {
     try {
       for (const { entryId, patch } of patches) await store.decide(entryId, patch);
       setDecision(next);
-      setLogNote(
-        `Recorded in the AI audit log for ${patches.length} call${patches.length === 1 ? "" : "s"}${failed ? `; ${failed} failed call${failed === 1 ? " has" : "s have"} nothing to review and stay${failed === 1 ? "s" : ""} pending` : ""}.`,
-      );
+      setLogNote(describeDecision(patches, failed));
     } catch {
       setLogNote("The audit log is not available in this browser, so the decision was not saved.");
     }
@@ -239,8 +255,11 @@ export function TopicHarness({ items }: { items: HarnessItem[] }) {
             </p>
             <p className="text-xs text-muted-foreground">
               About {formatInt(tokens.input + tokens.output)} tokens
-              {cost !== null ? `, roughly US$${cost.toFixed(cost < 0.01 ? 4 : 3)}` : ""}, billed by{" "}
-              {PROVIDERS[provider].label} to your key.
+              {cost !== null ? `, roughly ${usd(cost)}` : ""}, billed by {PROVIDERS[provider].label}{" "}
+              to your key.
+              {thinks
+                ? ` This model also thinks before it answers, and thinking is billed as output, so the real charge can be several times higher${ceilingCost !== null ? ` (at most ${usd(ceilingCost)} if every request used its ${formatInt(maxTokens)}-token ceiling)` : ""}. The AI log records the tokens actually used.`
+                : ""}
             </p>
           </div>
         </div>
@@ -354,26 +373,23 @@ function RunResults({
           : `The 95% interval for the difference includes zero, so these ${m} excerpts cannot tell the two apart.`;
   const editsCount = Object.keys(edits).length;
 
-  const rows = run.items.map((i) => {
-    const scored = scoredIds.has(i.id);
-    const modelLabel = scored ? (run.result.labels[i.id] ?? NO_ANSWER) : "";
-    return {
-      id: i.id,
-      excerpt: i.excerpt,
-      source: i.url,
-      gold: i.gold,
-      rules: i.rules,
-      scored,
-      model_label: modelLabel,
-      human_correction: edits[i.id] ?? "",
-      model_matches_gold: scored ? modelLabel === i.gold : "",
-      rules_match_gold: i.rules === i.gold,
-    };
+  const rows = runExportRows({
+    runId: run.runId,
+    simulated: run.simulated,
+    provider: run.provider,
+    model: run.model,
+    servedModel: run.result.servedModel,
+    seed: run.seed,
+    items: run.items,
+    scoredIds,
+    labels: run.result.labels,
+    edits,
   });
   const exportMeta = {
     run_id: run.runId,
     started_at: run.startedAt,
-    labeller: run.simulated ? "simulated (no model called)" : "LLM",
+    labeller: runLabeller(run.simulated, run.provider, run.model),
+    ai_generated: !run.simulated,
     provider: run.provider,
     model: run.model,
     served_model: run.result.servedModel,
@@ -436,6 +452,21 @@ function RunResults({
           Simulated labels: each excerpt gets its gold label with probability 0.7, otherwise a
           random other label. They show how the harness, the audit log and the exports work. They
           say nothing about any model.
+        </p>
+      ) : null}
+
+      {run.result.logWriteFailures > 0 ? (
+        <p
+          role="alert"
+          className="flex gap-2 border-b border-border bg-destructive/5 px-4 py-2.5 text-sm sm:px-5"
+        >
+          <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+          <span>
+            {run.result.logWriteFailures} of {run.result.entryIds.length} call
+            {run.result.entryIds.length === 1 ? "" : "s"} could not be written to the AI audit log
+            in this browser (storage is unavailable or full), so they are missing from the log and a
+            decision on them cannot be saved. Export the results below to keep a record.
+          </span>
         </p>
       ) : null}
 
@@ -570,7 +601,9 @@ function RunResults({
               onClick={() => onDecide("edited")}
               aria-pressed={decision === "edited"}
             >
-              Record {editsCount || ""} correction{editsCount === 1 ? "" : "s"}
+              {editsCount
+                ? `Accept with ${editsCount} correction${editsCount === 1 ? "" : "s"}`
+                : "Accept with corrections"}
             </Button>
             <Button
               size="sm"
@@ -587,9 +620,14 @@ function RunResults({
           </span>
         )}
         <span className="text-xs text-muted-foreground" role="status">
-          {logNote ?? (reviewable.size > 0 ? `Decision: ${decision}.` : "")}{" "}
-          <Link href="/ai-log" className="inline-link">
-            Open the AI log
+          {logNote ??
+            (reviewable.size > 0
+              ? decision === "pending"
+                ? "Decision: pending. Calls you leave undecided stay awaiting review; you can still accept or reject them in the AI log."
+                : `Decision: ${decision}.`
+              : "")}{" "}
+          <Link href="/ai-log" target="_blank" rel="noopener" className="inline-link">
+            Open the AI log<span className="sr-only"> (opens in a new tab)</span>
           </Link>
         </span>
         <span className="ml-auto flex gap-2">
@@ -597,19 +635,8 @@ function RunResults({
             size="sm"
             onClick={() =>
               downloadText(
-                `topic-labels-${fileStamp()}.csv`,
-                toCsv(rows, [
-                  "id",
-                  "excerpt",
-                  "source",
-                  "gold",
-                  "rules",
-                  "scored",
-                  "model_label",
-                  "human_correction",
-                  "model_matches_gold",
-                  "rules_match_gold",
-                ]),
+                runFileName(run.simulated, fileStamp(), "csv"),
+                toCsv(rows, RUN_CSV_COLUMNS),
                 "text/csv",
               )
             }
@@ -620,7 +647,7 @@ function RunResults({
             size="sm"
             onClick={() =>
               downloadText(
-                `topic-labels-${fileStamp()}.json`,
+                runFileName(run.simulated, fileStamp(), "json"),
                 JSON.stringify({ ...exportMeta, rows }, null, 2),
                 "application/json",
               )
@@ -631,8 +658,9 @@ function RunResults({
         </span>
       </div>
       <p className="px-4 pb-3 text-xs text-muted-foreground sm:px-5">
-        Scores always use the {nameInText}&apos;s own labels. A correction you make below is
-        recorded in the audit log as an edit; it never changes the evaluation.
+        Scores always use the {nameInText}&apos;s own labels. &ldquo;Accept with corrections&rdquo;
+        records each corrected call as edited and the other answered calls as accepted; a correction
+        never changes the evaluation.
       </p>
 
       {/* Phones: one entry per excerpt. */}

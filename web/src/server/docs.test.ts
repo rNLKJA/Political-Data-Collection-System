@@ -3,7 +3,16 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { decisionSlug, firstTable, headingId, resolveDocHref, splitTitle } from "@/lib/docs";
+import {
+  decisionSlug,
+  firstTable,
+  headingId,
+  linkAmendments,
+  parseAmends,
+  parseDecisionRecord,
+  resolveDocHref,
+  splitTitle,
+} from "@/lib/docs";
 import { EVAL_ITEMS, EXCERPTS_NAMING_CANDIDATE, GOLD_META } from "@/lib/topics/data";
 import { scoreLabeller } from "@/lib/topics/evaluation";
 import { keywordLabel } from "@/lib/topics/keyword-rules";
@@ -38,6 +47,8 @@ describe("docs mirrored into web/content", () => {
       "DR-004",
       "DR-005",
       "DR-006",
+      "DR-007",
+      "DR-008",
     ]);
     const sections = [
       "## Context",
@@ -66,6 +77,18 @@ describe("docs mirrored into web/content", () => {
       expect(getDecision(r.slug)?.id).toBe(r.id);
     }
     expect(getDecision("nope")).toBeUndefined();
+  });
+
+  it("links each amended record to the later records that amend it", () => {
+    const byId = Object.fromEntries(listDecisions().map((r) => [r.id, r]));
+    expect(byId["DR-005"].amends).toEqual(["DR-004"]);
+    expect(byId["DR-006"].amends).toEqual(["DR-003"]);
+    expect(byId["DR-007"].amends).toEqual(["DR-004"]);
+    expect(byId["DR-008"].amends).toEqual(["DR-006"]);
+    expect(byId["DR-004"].amendedBy.map((a) => a.id)).toEqual(["DR-005", "DR-007"]);
+    expect(byId["DR-003"].amendedBy.map((a) => a.id)).toEqual(["DR-006"]);
+    expect(byId["DR-006"].amendedBy.map((a) => a.id)).toEqual(["DR-008"]);
+    expect(byId["DR-001"].amendedBy).toEqual([]);
   });
 
   it("keeps the model card's baseline numbers in step with the computed scores", () => {
@@ -97,7 +120,7 @@ describe("docs mirrored into web/content", () => {
   it.runIf(existsSync(docsDir))(
     "never calls a draft gold set hand-labelled in visitor-facing text or docs",
     () => {
-      if (GOLD_META.status !== "draft") return;
+      if (GOLD_META.provenance.method === "blind-relabel") return;
       const files = [
         path.join(docsDir, "..", "README.md"),
         path.join(docsDir, "model-card.md"),
@@ -123,6 +146,31 @@ describe("doc helpers", () => {
     expect(splitTitle("No title")).toEqual({ title: "", body: "No title" });
     expect(firstTable("x\n\n| A | B |\n| - | - |\n| 1 | two |\n")).toEqual({ A: "1", B: "two" });
     expect(firstTable("no table")).toEqual({});
+  });
+
+  it("finds the records a record amends, from its decision line or an Amends column", () => {
+    expect(parseAmends("DR-009", "Do X. This amends the scoring rule of DR-004.", {})).toEqual([
+      "DR-004",
+    ]);
+    expect(parseAmends("DR-009", "Do X. Two statements in DR-003 are corrected here.", {})).toEqual(
+      ["DR-003"],
+    );
+    // naming a record without changing it is not an amendment
+    expect(parseAmends("DR-009", "Do X, as DR-002 does for quotations.", {})).toEqual([]);
+    expect(parseAmends("DR-009", "Do X.", { Amends: "DR-001, DR-002" })).toEqual([
+      "DR-001",
+      "DR-002",
+    ]);
+    expect(parseAmends("DR-009", "This supersedes DR-009 and DR-001.", {})).toEqual(["DR-001"]);
+
+    const rec = (id: string, decision: string) =>
+      parseDecisionRecord(
+        `${id}-x.md`,
+        `# ${id}: T\n\n**Decision:** ${decision}\n\n| Status | Decided | Recorded |\n| - | - | - |\n| Accepted | d | r |\n`,
+      );
+    const linked = linkAmendments([rec("DR-001", "Do A."), rec("DR-002", "This amends DR-001.")]);
+    expect(linked[0].amendedBy).toEqual([{ id: "DR-002", slug: "dr-002-x", title: "T" }]);
+    expect(linked[1].amendedBy).toEqual([]);
   });
 
   it("maps GitHub-relative links onto site routes", () => {

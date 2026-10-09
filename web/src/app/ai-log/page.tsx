@@ -26,8 +26,14 @@ export default function AiLogPage() {
         <AuditLogView />
         <Callout title="What the log is for">
           It lets you check what the AI features did and export a record (JSON or CSV) for your own
-          files. Simulated runs from the no-key demo are logged too, marked &ldquo;simulated&rdquo;:
-          no model was called for them. Clearing the log deletes it from this browser only. See the{" "}
+          files. You can accept or reject any call that returned an answer, with a note; each
+          decision is added to that call&apos;s history, so changing your mind never erases the
+          earlier one. Corrections to single labels are made on the run itself, on{" "}
+          <Link href="/topics" className="inline-link">
+            Topic labels
+          </Link>
+          . Simulated runs from the no-key demo are logged too, marked &ldquo;simulated&rdquo;: no
+          model was called for them. Clearing the log deletes it from this browser only. See the{" "}
           <Link href="/methods#ai-use" className="inline-link">
             AI use statement
           </Link>

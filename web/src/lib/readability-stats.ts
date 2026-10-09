@@ -33,8 +33,25 @@ import { signTest, tIntervalMean, type SignTest, type TInterval } from "@/lib/st
 export const READABILITY_RESAMPLES = 10_000;
 /** Groups smaller than this get a point estimate but no interval. */
 export const MIN_GROUP_FOR_INTERVAL = 5;
-/** Groups from fewer clusters (speakers or cycles) than this get no interval either. */
-export const MIN_CLUSTERS_FOR_INTERVAL = 5;
+/**
+ * Document cells from fewer speakers (the resampled clusters) than this get no
+ * interval either. With very few clusters a cluster bootstrap runs narrow: at
+ * 6 speakers, 2024 addresses came out narrower than resampling documents
+ * (DR-008, which raised this from 5).
+ */
+export const MIN_CLUSTERS_FOR_INTERVAL = 10;
+
+/** In two transcripts of one event, a speaker's word counts must agree this closely (DR-008). */
+export const TWIN_SPEAKER_TOLERANCE = 0.02;
+
+/**
+ * Whether two transcripts give a speaker (almost) the same words: within 2% of
+ * the larger count. Otherwise they attribute different turns to the speaker,
+ * and a grade difference would mix attribution with punctuation.
+ */
+export function sameWords(t: { wordsA: number; wordsB: number }): boolean {
+  return Math.abs(t.wordsA - t.wordsB) < TWIN_SPEAKER_TOLERANCE * Math.max(t.wordsA, t.wordsB);
+}
 
 export type Register = "written" | "transcribed" | "address";
 
