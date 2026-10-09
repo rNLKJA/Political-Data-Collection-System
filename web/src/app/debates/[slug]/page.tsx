@@ -163,7 +163,7 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
           <Panel>
             <h2 className="font-serif text-xl">How long each turn ran</h2>
             <p className="mt-1 mb-4 text-xs text-muted-foreground">
-              Ticks are single turns; boxes span the middle half; the dark bar is the median.
+              Ticks are single turns; boxes span the middle half; the heavy bar is the median.
             </p>
             <TurnStrips
               rows={shown
@@ -279,7 +279,7 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
           {next ? (
             <Link
               href={`/debates/${next.slug}`}
-              className="group flex items-start gap-2 text-right text-sm sm:flex-row-reverse"
+              className="group flex flex-row-reverse items-start gap-2 self-end text-right text-sm sm:self-auto"
             >
               <ArrowRight className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>

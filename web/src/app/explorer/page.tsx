@@ -14,16 +14,18 @@ import { buildHref } from "@/lib/url";
 import {
   allMonths,
   exploreDocuments,
+  getOverview,
   getSpeakers,
   PAGE_SIZE,
   speakerBySlug,
 } from "@/server/corpus";
 
-export const metadata: Metadata = {
-  title: "Explorer",
-  description:
-    "Filter 7,556 US campaign documents (2016 to 2024) by candidate, document type, date and title, and see how many were published each month.",
-};
+export function generateMetadata(): Metadata {
+  return {
+    title: "Explorer",
+    description: `Filter ${formatInt(getOverview().documents)} US campaign documents (2016 to 2024) by candidate, document type, date and title, and see how many were published each month.`,
+  };
+}
 
 export default function ExplorerPage(props: PageProps<"/explorer">) {
   return (
@@ -106,7 +108,7 @@ async function ExplorerResults({
             <StatTile
               label="Documents"
               value={formatInt(result.total)}
-              note="of 7,556 de-duplicated"
+              note={`of ${formatInt(getOverview().documents)} de-duplicated`}
             />
             <StatTile label="Words (original count)" value={formatCompact(result.words)} />
             <StatTile

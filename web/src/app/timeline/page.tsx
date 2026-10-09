@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { LegendSwatch } from "@/components/charts/chart-tooltip";
 import { Callout, EmptyState, SourceLink, StatTile, TableView } from "@/components/common/bits";
@@ -11,7 +11,7 @@ import { SERIES_VARS } from "@/lib/chart";
 import { DEFAULT_CONCEPT } from "@/lib/concepts";
 import { formatDate, formatDecimal, formatInt } from "@/lib/format";
 import { parseTimelineParams } from "@/lib/params";
-import { normaliseTerm } from "@/lib/textkit";
+import { conceptRanges, normaliseTerm } from "@/lib/textkit";
 import { buildHref } from "@/lib/url";
 import { cn } from "@/lib/utils";
 import { conceptSnippets, getConcepts, getSpeakers, speakerBySlug } from "@/server/corpus";
@@ -86,6 +86,20 @@ async function TimelineResults({
       selected={chosen.map((s, i) => ({ slug: s.slug, name: s.name, slot: i }))}
     />
   );
+
+  if (params.term && !term) {
+    return (
+      <div className="space-y-8">
+        {controls}
+        <EmptyState title={`“${params.term}” has no letters to look up`}>
+          <p>
+            The word index holds words made of letters only, so numbers and symbols such as “2020”
+            or “9/11” cannot be charted. Try a word, or pick a topic from the list.
+          </p>
+        </EmptyState>
+      </div>
+    );
+  }
 
   const termKnown = term && !term.includes(" ") && hasTerm(term);
   if (term && !termKnown) {
@@ -173,7 +187,11 @@ async function TimelineResults({
         <StatTile
           label="Counted as"
           value={<span className="text-lg leading-tight font-medium">{subject}</span>}
-          note={concept ? `matches: ${patterns.join(", ")}` : "a single indexed word"}
+          note={
+            concept
+              ? `matches: ${patterns.join(", ")}${patterns.some((p) => /^[A-Z]/.test(p)) ? " (capitalised only)" : ""}`
+              : "a single indexed word"
+          }
         />
       </div>
 
@@ -187,11 +205,45 @@ async function TimelineResults({
           </p>
         </div>
         <div className="mt-4">
-          <TimelineChart
-            periods={periods}
-            series={chartSeries}
-            label={`Line chart of ${subject} per 10,000 words by ${params.by} for ${series.map((s) => s.label).join(", ")}, with 95% intervals`}
-          />
+          {series.every((s) => s.points.length === 0) ? (
+            <div className="grid min-h-60 place-items-center rounded-md border border-dashed border-border bg-background/50 p-6 text-center">
+              <div>
+                <p className="font-serif text-lg">Too little text per {params.by} to plot</p>
+                <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                  Every {params.by} here has fewer than {formatInt(MIN_PERIOD_WORDS)} words, so the
+                  rates would be mostly noise.{" "}
+                  {params.by === "year"
+                    ? "Try another candidate, or clear the candidates to see the whole field."
+                    : "A longer period pools more text."}
+                </p>
+                <p className="mt-3 flex flex-wrap justify-center gap-2">
+                  {(params.by === "month"
+                    ? (["quarter", "year"] as const)
+                    : params.by === "quarter"
+                      ? (["year"] as const)
+                      : []
+                  ).map((b) => (
+                    <Link
+                      key={b}
+                      href={buildHref("/timeline", {
+                        ...current,
+                        by: b === "quarter" ? undefined : b,
+                      })}
+                      className="rounded-full border border-border px-3 py-1 text-sm hover:bg-accent"
+                    >
+                      Show by {b}
+                    </Link>
+                  ))}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <TimelineChart
+              periods={periods}
+              series={chartSeries}
+              label={`Line chart of ${subject} per 10,000 words by ${params.by} for ${series.map((s) => s.label).join(", ")}, with 95% intervals`}
+            />
+          )}
         </div>
         {series.some((s) => s.hidden) ? (
           <p className="mt-2 text-xs text-muted-foreground">
@@ -239,9 +291,10 @@ async function TimelineResults({
                   className="rounded-md border border-border/80 bg-background/60 p-4"
                 >
                   <blockquote className="font-serif text-[1.02rem] leading-relaxed">
-                    {s.snippet.slice(0, s.hlStart)}
-                    <mark className="hit">{s.snippet.slice(s.hlStart, s.hlEnd)}</mark>
-                    {s.snippet.slice(s.hlEnd)}
+                    <Highlighted
+                      text={s.snippet}
+                      ranges={conceptRanges(s.snippet, patterns, [s.hlStart, s.hlEnd])}
+                    />
                   </blockquote>
                   <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
@@ -308,8 +361,9 @@ async function TimelineResults({
       <Callout title="Reading the bands">
         A rate per 10,000 words lets busy and quiet months be compared. The interval treats each
         period&apos;s count as Poisson: with 10,000 words and no mentions the band still reaches
-        about 3.7 per 10k. Topic lists are matched as whole words or phrases after lower-casing;
-        they count mentions, not stances. See{" "}
+        about 3.7 per 10k. Topic lists are matched as whole words or phrases, ignoring case except
+        for the two party names, which count only when capitalised; they count mentions, not
+        stances. See{" "}
         <Link href="/methods#timeline" className="inline-link">
           Methods
         </Link>
@@ -317,4 +371,22 @@ async function TimelineResults({
       </Callout>
     </div>
   );
+}
+
+/** `text` with each of the (sorted, non-overlapping) `ranges` marked. */
+function Highlighted({ text, ranges }: { text: string; ranges: Array<[number, number]> }) {
+  const parts: ReactNode[] = [];
+  let at = 0;
+  for (const [a, b] of ranges) {
+    if (a < at) continue;
+    if (a > at) parts.push(text.slice(at, a));
+    parts.push(
+      <mark key={a} className="hit">
+        {text.slice(a, b)}
+      </mark>,
+    );
+    at = b;
+  }
+  parts.push(text.slice(at));
+  return <>{parts}</>;
 }

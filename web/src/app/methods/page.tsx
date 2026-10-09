@@ -72,10 +72,32 @@ function Formula({ children, label }: { children: React.ReactNode; label: string
       className="my-4 overflow-x-auto rounded-md border border-border bg-background/70 px-4 py-3"
     >
       <figcaption className="kicker mb-2">{label}</figcaption>
-      <div className="font-[ui-monospace,SFMono-Regular,Menlo,Consolas,monospace] text-[0.82rem] leading-7 whitespace-pre">
+      {/* Wraps on phones (alignment gives way to legibility); aligned columns from sm up. */}
+      <div className="font-[ui-monospace,SFMono-Regular,Menlo,Consolas,monospace] text-[0.82rem] leading-7 [overflow-wrap:anywhere] whitespace-pre-wrap sm:whitespace-pre">
         {children}
       </div>
     </figure>
+  );
+}
+
+function ParityResult({ py }: { py: boolean | null }) {
+  if (py === null) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <Minus className="size-3.5" aria-hidden />
+        n/a (new in 2026)
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-xs">
+      {py ? (
+        <Check className="size-3.5 text-primary" aria-hidden />
+      ) : (
+        <X className="size-3.5 text-destructive" aria-hidden />
+      )}
+      {py ? "identical" : "differs"}
+    </span>
   );
 }
 
@@ -265,10 +287,28 @@ export default function MethodPage() {
             description="Two independent checks. scripts/parity_check.py executes the notebook cells verbatim, with the network replaced by a stub that serves pages rebuilt from the stored data. The Vitest suites then run the TypeScript ports over the same CSVs."
             className="px-0 sm:px-0"
           >
+            {/* Phones: one card per check. */}
+            <ul className="divide-y divide-border/70 rounded-lg border border-border sm:hidden">
+              {parityRows.map((r) => (
+                <li key={r.what} className="space-y-1.5 px-3 py-3 text-sm">
+                  <p className="font-medium">{r.what}</p>
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                    <dt className="text-muted-foreground">Rows</dt>
+                    <dd className="tabular">{r.n}</dd>
+                    <dt className="text-muted-foreground">Original Python</dt>
+                    <dd>
+                      <ParityResult py={r.py} />
+                    </dd>
+                    <dt className="text-muted-foreground">TypeScript test</dt>
+                    <dd className="font-mono wrap-anywhere text-muted-foreground">{r.ts}</dd>
+                  </dl>
+                </li>
+              ))}
+            </ul>
             <div
-              className="overflow-x-auto rounded-lg border border-border"
+              className="hidden overflow-x-auto rounded-lg border border-border sm:block"
               role="region"
-              aria-label="Parity checks (scrolls sideways on small screens)"
+              aria-label="Parity checks"
               tabIndex={0}
             >
               <table className="w-full min-w-[40rem] text-left text-sm">
@@ -295,21 +335,7 @@ export default function MethodPage() {
                       <td className="px-3 py-2">{r.what}</td>
                       <td className="tabular px-3 py-2 text-muted-foreground">{r.n}</td>
                       <td className="px-3 py-2">
-                        {r.py === null ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <Minus className="size-3.5" aria-hidden />
-                            n/a (new in 2026)
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs">
-                            {r.py ? (
-                              <Check className="size-3.5 text-primary" aria-hidden />
-                            ) : (
-                              <X className="size-3.5 text-destructive" aria-hidden />
-                            )}
-                            {r.py ? "identical" : "differs"}
-                          </span>
-                        )}
+                        <ParityResult py={r.py} />
                       </td>
                       <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.ts}</td>
                     </tr>
@@ -452,9 +478,13 @@ z_w     = δ_w / σ(δ_w)`}
               </p>
               <p>
                 The topic list has {concepts.length} entries chosen to cover policy areas that
-                campaigns of both major parties talk about, and both party names. The adjective
-                “Democratic” is left out because it is also a party name. Topics:{" "}
-                {concepts.map((c) => c.label).join(", ")}.
+                campaigns of both major parties talk about, and both party names. Topic words are
+                matched as whole words, ignoring case, with one exception. The two party topics are
+                defined the same way: the party&apos;s noun and its party adjective, counted only
+                when capitalised (“Democrat”, “Democrats”, “Democratic”; “Republican”,
+                “Republicans”). Capitalisation separates “Democratic Party” and “Republican nominee”
+                from the generic words “democratic” and “republican”, which are left out for both.
+                Topics: {concepts.map((c) => c.label).join(", ")}.
               </p>
             </div>
             <Formula label="Exact Poisson interval for k mentions in N words">
@@ -488,9 +518,12 @@ rate  = k / N × 10,000      interval scaled the same way`}
                 these markers), turns tagged “(from videotape.)”, and labels such as “VIDEO CLIP OF
                 …” are counted as <em>Recorded clips</em>, so a candidate heard only in a clip, such
                 as a president quoted at the other party&apos;s primary, is not listed as taking
-                part. A clip whose end marker is missing covers only the next speaker. Where a
-                source transcript leaves out a label, the words go to the previous speaker; one such
-                gap in the January 2004 Greenville debate is visible in its moderator share.
+                part. A clip whose end marker is missing covers only the next speaker. A bold
+                “MODERATOR:” label is a turn unless it heads the list of names at the top of the
+                page, and the build stops if moderators get less than 2% of a debate&apos;s words,
+                which would mean their labels were missed. Where a source transcript leaves out a
+                label, the words go to the previous speaker; one such gap in the January 2004
+                Greenville debate is visible in its moderator share.
               </p>
             </div>
             <details className="mt-4 rounded-lg border border-border bg-card p-4 text-sm">

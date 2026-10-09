@@ -13,13 +13,19 @@ export const DOC_TYPES = [
 ] as const;
 export type DocType = (typeof DOC_TYPES)[number];
 
+/**
+ * How the original notebook typed a document from its title. The first rule
+ * that matches wins, in this order: debate, remarks or speech, interview,
+ * statement, address, otherwise Document.
+ */
 export const DOC_TYPE_NOTE: Record<DocType, string> = {
-  Document: "Everything else, mostly campaign press releases",
-  Statement: "Title contains “statement”",
-  "Speech/Remarks": "Title contains “remarks” or “speech”",
-  Debate: "Title contains “debate” (press releases about debates, not transcripts)",
-  Address: "Title contains “address”",
-  Interview: "Title contains “interview”",
+  Debate:
+    "Title contains “debate” (checked first; mostly press releases about debates, not transcripts)",
+  "Speech/Remarks": "Title contains “remarks” or “speech”, and not “debate”",
+  Interview: "Title contains “interview”, and none of debate, remarks or speech",
+  Statement: "Title contains “statement”, and none of debate, remarks, speech or interview",
+  Address: "Title contains “address”, and none of the words above",
+  Document: "Every other title, mostly campaign press releases",
 };
 
 export interface Speaker {

@@ -15,6 +15,8 @@ const nextConfig: NextConfig = {
   // server function.
   outputFileTracingIncludes: {
     "/**": ["./data/analytics.db"],
+    // Read with fs by the social-sharing image.
+    "/opengraph-image": ["./src/app/fonts/*.woff"],
   },
   outputFileTracingRoot: path.join(__dirname),
   turbopack: {

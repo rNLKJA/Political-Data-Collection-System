@@ -2,7 +2,7 @@ import "server-only";
 
 import { CYCLES, type Cycle } from "@/lib/corpus-types";
 import { decodePostings } from "@/lib/postings";
-import { DEFAULT_ALPHA0, fightinWords, Z_THRESHOLD } from "@/lib/stats/fightin-words";
+import { DEFAULT_ALPHA0, fightinWords, Z_STRONG, Z_THRESHOLD } from "@/lib/stats/fightin-words";
 import { fightinWordsStability } from "@/lib/stats/fw-stability";
 import { rateWithInterval } from "@/lib/stats/poisson";
 import { allMonths, getDocumentsByIds, speakerBySlug } from "@/server/corpus";
@@ -176,10 +176,12 @@ export interface FightinWordsView {
   topB: DistinctiveWord[];
   /** a sample of every word for the funnel plot: [log10 total count, z, flag] */
   cloud: Array<[number, number, 0 | 1 | 2]>;
-  /** words used by either group: the ones tested */
-  tested: number;
-  /** tested words with |z| >= Z_THRESHOLD */
+  /** words used by at least one group, i.e. the words actually compared */
+  compared: number;
+  /** compared words with |z| >= 1.96 (each tested on its own) */
   significant: number;
+  /** compared words with |z| >= 3.29 (two-sided p < 0.001) */
+  strong: number;
 }
 
 const fwCache = new Map<string, FightinWordsView>();
@@ -236,7 +238,11 @@ export function computeFightinWords(
   // side plus an even sample of the rest, so the payload stays small.
   const cloud: FightinWordsView["cloud"] = [];
   let significant = 0;
-  for (const t of order) if (Math.abs(res.z[t]) >= Z_THRESHOLD) significant++;
+  let strong = 0;
+  for (const t of order) {
+    if (Math.abs(res.z[t]) >= Z_THRESHOLD) significant++;
+    if (Math.abs(res.z[t]) >= Z_STRONG) strong++;
+  }
   const stride = Math.max(1, Math.floor(order.length / 950));
   order.forEach((t, rank) => {
     const z = res.z[t];
@@ -265,8 +271,9 @@ export function computeFightinWords(
     topA,
     topB,
     cloud,
-    tested: order.length,
+    compared: order.length,
     significant,
+    strong,
   };
   if (fwCache.size > 200) fwCache.clear();
   fwCache.set(key, view);

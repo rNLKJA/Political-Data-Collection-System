@@ -26,7 +26,7 @@ tools.
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Explorer**          | 7,556 documents filtered by candidate, document type, year and title; documents per month; links to every source page.                                                                                                                              |
 | **Distinctive words** | Monroe, Colaresi and Quinn's (2008) weighted log-odds with an informative Dirichlet prior between any two candidates or election cycles, with a funnel plot, example documents and a document-level bootstrap check of how stable each top word is. |
-| **Debates**           | 179 transcripts split into 43,662 speaking turns: talk share, turn lengths, moderator share and reading grade from 1960 to 2024, and a turn-by-turn view of each debate.                                                                            |
+| **Debates**           | 179 transcripts split into 44,255 speaking turns: talk share, turn lengths, moderator share and reading grade from 1960 to 2024, and a turn-by-turn view of each debate.                                                                            |
 | **Term timeline**     | Mentions per 10,000 words for 44 policy topics or any indexed word, with exact Poisson 95% intervals and short quoted passages.                                                                                                                     |
 | **Readability**       | Flesch-Kincaid trends with bootstrap intervals: debates 1960 to 2024, documents by cycle and kind of text, a paired within-speaker comparison, and two debates held in two transcripts.                                                             |
 | **Topic labels**      | An LLM against a frozen keyword dictionary on 120 labelled excerpts: agreement, Cohen's kappa, paired differences and McNemar's test. Bring your own key; a simulated run works without one.                                                        |
@@ -216,6 +216,10 @@ pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build
 `pnpm typecheck` runs `next typegen && tsc --noEmit`, because Next 16's global route types
 (`PageProps`, `LayoutProps`) only exist after type generation.
 
+Deploying: the production site at <https://campaign-text-lab.vercel.app> is the Vercel project
+`campaign-text-lab`, deployed from inside `web/` (`vercel deploy --prod`). It needs no environment
+variables: there are no accounts, sessions or secrets.
+
 ## How the data artefacts are generated
 
 Everything the site shows is derived from `original/*.csv` by two scripts, run from the repository
@@ -244,14 +248,20 @@ and stores per-document metadata and Flesch-Kincaid statistics, a compressed inv
 25 words, and per-turn word counts for the debates. It also writes reference values for the
 TypeScript tests (Fightin' Words z-scores, and Poisson intervals from SciPy).
 
-Two rules keep the derived data neutral:
+Three rules keep the derived data neutral:
 
 - **Debate roles.** A speaker counts as a candidate only if they are on the cycle's list of debate
   participants, belong to the party holding the debate when it is a primary, and are named in the
   page's Participants block when it has one. Recorded clips played during a debate ("[begin video
   clip]" ... "[end video clip]", "(from videotape.)", "VIDEO CLIP OF ...") are counted as "Recorded
   clips", not as anyone's live speech, so a president quoted in a clip at the other party's primary
-  is not listed as taking part. The build asserts both rules for every debate.
+  is not listed as taking part. A bold "MODERATOR:" label is a moderator's turn unless it heads the
+  list of names at the top of the page. The build asserts these rules for every debate, and stops if
+  the moderators of any debate get less than 2% of its words (a sign their labels were missed).
+- **Party topics.** The two party topics are defined the same way: the party's noun and its party
+  adjective, counted only when capitalised ("Democrat", "Democrats", "Democratic"; "Republican",
+  "Republicans"). Capitalisation separates "Democratic Party" and "Republican nominee" from the
+  generic words "democratic" and "republican", which are left out for both.
 - **Quotations.** Topic snippets illustrate how a topic is discussed. A quoted window is skipped
   (the next use, then the next document, is tried) if it names another candidate or uses a charged
   word such as "liar", "racist" or "Hitler" (`CHARGED_WORDS` in `build_analytics.py`).
@@ -271,6 +281,11 @@ sqlite3 web/data/analytics.db "SELECT key, value FROM meta"   # build provenance
 Tables: `speakers`, `documents` (metadata and statistics, no text), `terms` (compressed postings),
 `concepts`, `concept_hits`, `concept_snippets` (quotations of 25 words or fewer), `debates`,
 `debate_speakers` and `debate_turns`.
+
+Because visitors never write anything to the server, there is no hosted database (such as Turso)
+and no admin "records" area: the live site reads exactly this file, so opening it locally shows
+every record the site uses. The one thing a visitor can create, the AI audit log, stays in their
+own browser (see [Viewing the AI audit log](#viewing-the-ai-audit-log)).
 
 ### Parity with the original code
 

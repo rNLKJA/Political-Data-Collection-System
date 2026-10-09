@@ -193,10 +193,15 @@ def clean_document(content: str, speaker: str) -> CleanResult:
 
 # ---------------------------------------------------------------------------
 # Controlled vocabulary for the term timeline.
-# Each concept is a list of token sequences; a match is any sequence.
+# Each concept is a list of token sequences; a match is any sequence. Words are
+# compared lower-cased, except that a pattern word starting with a capital
+# letter only matches a source word that also starts with one.
 # Chosen to cover policy areas both major parties campaign on, plus both party
-# names, so no side is privileged. "Democratic" (the adjective) is excluded on
-# purpose because it is also the party's name.
+# names, so no side is privileged. The two party topics are defined the same
+# way: the party's noun and its party adjective, counted only when capitalised
+# (Democrat, Democrats, Democratic; Republican, Republicans). Capitalisation
+# separates the parties from the generic words "democratic" ("democratic
+# values") and "republican", which are left out for both.
 # ---------------------------------------------------------------------------
 CONCEPTS: list[tuple[str, str, list[str]]] = [
     ("economy", "Economy", ["economy", "economic", "economies"]),
@@ -241,8 +246,8 @@ CONCEPTS: list[tuple[str, str, list[str]]] = [
     ("women", "Women", ["women"]),
     ("children", "Children", ["child", "children", "kids"]),
     ("faith", "Faith", ["faith"]),
-    ("democrats", "Democrats (party)", ["democrat", "democrats"]),
-    ("republicans", "Republicans (party)", ["republican", "republicans"]),
+    ("democrats", "Democrats (party)", ["Democrat", "Democrats", "Democratic"]),
+    ("republicans", "Republicans (party)", ["Republican", "Republicans"]),
 ]
 
 
@@ -250,19 +255,39 @@ def concept_patterns() -> list[tuple[int, list[list[str]]]]:
     return [(i, [p.split(" ") for p in pats]) for i, (_, _, pats) in enumerate(CONCEPTS)]
 
 
-def match_concepts(tokens: list[str]) -> dict[int, list[tuple[int, int]]]:
-    """Return {concept_index: [(token_start, token_len), ...]} (non-overlapping per concept)."""
+def starts_upper(word: str) -> bool:
+    return word[:1] != word[:1].lower()
+
+
+def match_concepts(
+    tokens: list[str], cased: list[str] | None = None
+) -> dict[int, list[tuple[int, int]]]:
+    """Return {concept_index: [(token_start, token_len), ...]} (non-overlapping per concept).
+
+    ``tokens`` are lower-cased; ``cased`` holds the same tokens as spelled in the
+    source. A capitalised pattern word needs a capitalised source word, so it
+    never matches without ``cased``.
+    """
     out: dict[int, list[tuple[int, int]]] = {}
     pats = concept_patterns()
     n = len(tokens)
     for ci, seqs in pats:
+        lowered = [(seq, [w.lower() for w in seq]) for seq in seqs]
         hits: list[tuple[int, int]] = []
         i = 0
         while i < n:
             matched = 0
-            for seq in seqs:
+            for seq, low in lowered:
                 L = len(seq)
-                if i + L <= n and tokens[i] == seq[0] and tokens[i : i + L] == seq:
+                if (
+                    i + L <= n
+                    and tokens[i] == low[0]
+                    and tokens[i : i + L] == low
+                    and all(
+                        not starts_upper(w) or (cased is not None and starts_upper(cased[i + k]))
+                        for k, w in enumerate(seq)
+                    )
+                ):
                     matched = max(matched, L)
             if matched:
                 hits.append((i, matched))

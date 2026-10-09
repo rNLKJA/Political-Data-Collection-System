@@ -11,7 +11,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
         <Link
           href="/"
-          className="group flex items-baseline gap-2"
+          className="group flex shrink-0 items-baseline gap-2 whitespace-nowrap"
           aria-label={`${SITE.name}, home`}
         >
           <span

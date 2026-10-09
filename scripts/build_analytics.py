@@ -91,6 +91,13 @@ hatred hateful evil cheat* weak weakness attack*
 SAME_CAMPAIGN = {"EMHOFF": {"HARRIS"}}
 SCHEMA_VERSION = 1
 
+# Every debate has a moderator or panel asking the questions. A moderator share
+# of the words below this almost certainly means their speaker labels were not
+# recognised, so the build fails unless the debate is listed below with a
+# reason (APP page URL -> reason).
+MIN_MODERATOR_SHARE = 0.02
+LOW_MODERATOR_SHARE_OK: dict[str, str] = {}
+
 
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
@@ -189,6 +196,7 @@ def build_documents(con: sqlite3.Connection) -> dict:
         res = clean_document(r.Document_Content, r.Speaker)
         toks = tokenize(res.text)
         words_lower = [t.text for t in toks]
+        words_cased = [res.text[t.start : t.end] for t in toks]
         fk = flesch_kincaid(res.text)
         raw_words = len(tokenize(r.Document_Content.replace("\\n\\n", "\n")))
         all_words += raw_words
@@ -199,7 +207,7 @@ def build_documents(con: sqlite3.Connection) -> dict:
         year = int(r.Date[:4])
         cyc = cycle_of(year)
         sid = speaker_id[r.Speaker]
-        for ci, hits in match_concepts(words_lower).items():
+        for ci, hits in match_concepts(words_lower, words_cased).items():
             concept_hits.append((ci, doc_id, len(hits)))
             concept_candidates[(ci, sid, cyc)].append((len(hits), r.Date, doc_id, hits))
         doc_rows.append(
@@ -322,7 +330,7 @@ def candidate_surnames(speakers: list[str]) -> set[str]:
 
 
 def concept_words(ci: int) -> set[str]:
-    return {w for pat in CONCEPTS[ci][2] for w in pat.split(" ")}
+    return {w.lower() for pat in CONCEPTS[ci][2] for w in pat.split(" ")}
 
 
 SNIPPET_WORD = re.compile(r"[A-Za-z\u00C0-\u024F]+(?:['\u2019][A-Za-z]+)*")
@@ -475,6 +483,11 @@ def build_debates(con: sqlite3.Connection) -> dict:
         totals["words"] += total_words
         totals["unattributed"] += stats["unattributed_words"]
         totals["clip_words"] += stats["clip_words"]
+        share = role_words["moderator"] / total_words if total_words else 0.0
+        assert share >= MIN_MODERATOR_SHARE or r.URL in LOW_MODERATOR_SHARE_OK, (
+            f"moderator share {share:.1%} in {r.URL}: check the speaker labels, or add the "
+            "debate to LOW_MODERATOR_SHARE_OK with a reason"
+        )
 
     con.executemany(
         """INSERT INTO debates(id, url, date, year, cycle, title, kind, party, format,

@@ -14,6 +14,30 @@ export interface FunnelLabel {
   side: 1 | 2;
 }
 
+interface Box {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+
+interface Placement {
+  text: string;
+  anchor: "start" | "end";
+  tx: number;
+  ty: number;
+  leader: boolean;
+}
+
+const overlaps = (a: Box, b: Box) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+
+/** Rank of labels[i] among the labels on its side (labels arrive strongest first). */
+function rankInSide(labels: FunnelLabel[], i: number) {
+  let r = 0;
+  for (let j = 0; j < i; j++) if (labels[j].side === labels[i].side) r++;
+  return r;
+}
+
 /**
  * Monroe et al.'s funnel: z-score against total frequency. Words beyond
  * |z| = 1.96 take their group's colour; the rest stay a quiet grey.
@@ -49,53 +73,63 @@ export function FunnelPlot({
   const ordered = useMemo(() => [...cloud].sort((p, q) => p[2] - q[2]), [cloud]);
   const narrow = width < 520;
 
-  // Greedy placement, strongest words first: try the right of the dot, then
-  // the left. A label may not cover another label or another highlighted dot.
-  // Dots that sit on top of each other share the strongest word's label; the
-  // others keep their tooltip only.
-  const pos = labels.map((l) => ({ cx: x(l.x), cy: y(l.z) }));
+  // On narrow screens label fewer words: the strongest four on each side.
+  const shown = narrow ? labels.filter((_, i) => rankInSide(labels, i) < 4) : labels;
+
+  // Greedy placement, strongest words first. Each label tries the right of its
+  // dot, then the left, then nudged up or down with a short leader line; it may
+  // not cover another label or another highlighted dot. Dots that sit on top of
+  // each other share one label ("hillary · clinton"). The three strongest
+  // words on each side are always labelled, even if that means an overlap.
+  const pos = shown.map((l) => ({ cx: x(l.x), cy: y(l.z) }));
   const near = (i: number, j: number) =>
     Math.hypot(pos[i].cx - pos[j].cx, pos[i].cy - pos[j].cy) < 9;
-  const overlaps = (
-    a: { x0: number; x1: number; y0: number; y1: number },
-    b: { x0: number; x1: number; y0: number; y1: number },
-  ) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
-  const dotBox = (j: number) => ({
+  const dotBox = (j: number): Box => ({
     x0: pos[j].cx - 6.5,
     x1: pos[j].cx + 6.5,
     y0: pos[j].cy - 6.5,
     y1: pos[j].cy + 6.5,
   });
-  const placed: Array<{ x0: number; x1: number; y0: number; y1: number }> = [];
-  const labelled: number[] = [];
-  const texts: Array<{ anchor: "start" | "end"; tx: number } | null> = labels.map(() => null);
-  const order = labels
-    .map((_, i) => i)
-    .sort((a, b) => Math.abs(labels[b].z) - Math.abs(labels[a].z));
+  const placed: Box[] = [];
+  const done = new Set<number>();
+  const texts: Array<Placement | null> = shown.map(() => null);
+  const order = shown.map((_, i) => i).sort((a, b) => Math.abs(shown[b].z) - Math.abs(shown[a].z));
   for (const i of order) {
-    if (labelled.some((j) => near(i, j))) continue;
+    if (done.has(i)) continue;
+    const cluster = order.filter((j) => !done.has(j) && (j === i || near(i, j)));
+    const text = cluster.map((j) => shown[j].term).join(" · ");
     const { cx, cy } = pos[i];
-    const w = labels[i].term.length * 6.4 + 4;
-    const options = [
-      { anchor: "start" as const, tx: cx + 7, x0: cx + 5, x1: cx + 7 + w },
-      { anchor: "end" as const, tx: cx - 7, x0: cx - 7 - w, x1: cx - 5 },
-    ];
-    for (const o of options) {
-      const box = { x0: o.x0, x1: o.x1, y0: cy - 7, y1: cy + 7 };
-      if (box.x0 < 0 || box.x1 > innerW + m.right) continue;
-      const clash =
-        placed.some((b) => overlaps(box, b)) ||
-        pos.some((_, j) => j !== i && !near(i, j) && overlaps(box, dotBox(j)));
-      if (!clash) {
-        placed.push(box);
-        labelled.push(i);
-        texts[i] = { anchor: o.anchor, tx: o.tx };
-        break;
-      }
+    const w = text.length * 6.4 + 4;
+    const options: Placement[] = [];
+    for (const dy of [0, -14, 14, -28, 28]) {
+      options.push(
+        { text, anchor: "start", tx: cx + 7, ty: cy + dy, leader: dy !== 0 },
+        { text, anchor: "end", tx: cx - 7, ty: cy + dy, leader: dy !== 0 },
+      );
     }
+    const boxOf = (o: Placement): Box =>
+      o.anchor === "start"
+        ? { x0: o.tx - 2, x1: o.tx + w, y0: o.ty - 7, y1: o.ty + 7 }
+        : { x0: o.tx - w, x1: o.tx + 2, y0: o.ty - 7, y1: o.ty + 7 };
+    const inBounds = options.filter((o) => {
+      const b = boxOf(o);
+      return b.x0 >= 0 && b.x1 <= innerW + m.right && b.y0 >= -m.top && b.y1 <= innerH;
+    });
+    const free = inBounds.find((o) => {
+      const box = boxOf(o);
+      return (
+        !placed.some((b) => overlaps(box, b)) &&
+        !pos.some((_, j) => !cluster.includes(j) && overlaps(box, dotBox(j)))
+      );
+    });
+    const must = cluster.some((j) => rankInSide(shown, j) < 3);
+    const choice = free ?? (must ? inBounds[0] : undefined);
+    if (!choice) continue;
+    placed.push(boxOf(choice));
+    texts[i] = choice;
+    for (const j of cluster) done.add(j);
   }
-  const placements = labels.map((l, i) => ({ l, cx: pos[i].cx, cy: pos[i].cy, text: texts[i] }));
-  const shownLabels = narrow ? placements.filter((_, i) => i % 2 === 0) : placements;
+  const shownLabels = shown.map((l, i) => ({ l, cx: pos[i].cx, cy: pos[i].cy, text: texts[i] }));
 
   return (
     <div ref={ref} className="relative">
@@ -178,19 +212,30 @@ export function FunnelPlot({
               strokeWidth={2}
             />
           ))}
-          {shownLabels.map(({ l, cy, text }) =>
+          {shownLabels.map(({ l, cx, cy, text }) =>
             text ? (
-              <text
-                key={`label-${l.term}`}
-                x={text.tx}
-                y={cy}
-                dy="0.32em"
-                textAnchor={text.anchor}
-                className="fill-foreground font-mono text-[10.5px]"
-                style={{ paintOrder: "stroke", stroke: "var(--chart-surface)", strokeWidth: 3 }}
-              >
-                {l.term}
-              </text>
+              <g key={`label-${l.term}`}>
+                {text.leader ? (
+                  <line
+                    x1={cx}
+                    y1={cy}
+                    x2={text.anchor === "start" ? text.tx - 2 : text.tx + 2}
+                    y2={text.ty}
+                    stroke="var(--chart-axis)"
+                    strokeWidth={0.8}
+                  />
+                ) : null}
+                <text
+                  x={text.tx}
+                  y={text.ty}
+                  dy="0.32em"
+                  textAnchor={text.anchor}
+                  className="fill-foreground font-mono text-[10.5px]"
+                  style={{ paintOrder: "stroke", stroke: "var(--chart-surface)", strokeWidth: 3 }}
+                >
+                  {text.text}
+                </text>
+              </g>
             ) : null,
           )}
           {shownLabels.map(({ l, cx, cy }) => (
