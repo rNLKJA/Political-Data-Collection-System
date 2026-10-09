@@ -179,13 +179,13 @@ export function BarList({
   max?: number;
 }) {
   const top = max ?? Math.max(1, ...items.map((i) => i.value));
+  // One grid for the whole list (rows are subgrids), so every bar track has the
+  // same width and bar lengths stay comparable even when only some rows carry a
+  // note under their value.
   return (
-    <ul className="space-y-2.5">
+    <ul className="grid grid-cols-[minmax(0,9rem)_minmax(3rem,1fr)_auto] gap-x-3 gap-y-2.5 text-sm sm:grid-cols-[minmax(0,12rem)_minmax(4rem,1fr)_auto]">
       {items.map((it) => (
-        <li
-          key={it.key}
-          className="grid grid-cols-[minmax(0,9rem)_minmax(3rem,1fr)_auto] items-center gap-3 text-sm sm:grid-cols-[minmax(0,12rem)_minmax(4rem,1fr)_auto]"
-        >
+        <li key={it.key} className="col-span-3 grid grid-cols-subgrid items-center">
           <span className="truncate" title={typeof it.label === "string" ? it.label : undefined}>
             {it.label}
           </span>
