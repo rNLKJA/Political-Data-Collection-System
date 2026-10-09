@@ -1,10 +1,27 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import { ImageResponse } from "next/og";
+
+import { formatInt } from "@/lib/format";
+import { getOverview } from "@/server/corpus";
 
 export const alt = "Campaign Text Lab: US campaign documents and debates, read closely";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function OpengraphImage() {
+/**
+ * Newsreader, the site's headline face (WOFF: Satori cannot read WOFF2). See
+ * fonts/README.md. Cached so the image is still prerendered at build time.
+ */
+async function headlineFont() {
+  "use cache";
+  return readFile(path.join(process.cwd(), "src/app/fonts/newsreader-latin-400-normal.woff"));
+}
+
+export default async function OpengraphImage() {
+  const newsreader = await headlineFont();
+  const o = getOverview();
   return new ImageResponse(
     <div
       style={{
@@ -16,7 +33,7 @@ export default function OpengraphImage() {
         background: "#f3eee3",
         color: "#1e1a15",
         padding: "64px 72px",
-        fontFamily: "serif",
+        fontFamily: "Newsreader",
       }}
     >
       <div style={{ display: "flex", fontSize: 22, letterSpacing: 4, color: "#5b5346" }}>
@@ -27,7 +44,8 @@ export default function OpengraphImage() {
           What US campaigns put on the record, read closely.
         </div>
         <div style={{ display: "flex", marginTop: 28, fontSize: 28, color: "#24395a" }}>
-          7,556 campaign documents · 179 debate transcripts · 43,662 speaking turns
+          {formatInt(o.documents)} campaign documents · {formatInt(o.debates)} debate transcripts ·{" "}
+          {formatInt(o.debateTurns)} speaking turns
         </div>
       </div>
       <div
@@ -42,6 +60,9 @@ export default function OpengraphImage() {
         Derived statistics from The American Presidency Project, UC Santa Barbara
       </div>
     </div>,
-    size,
+    {
+      ...size,
+      fonts: [{ name: "Newsreader", data: newsreader, style: "normal", weight: 400 }],
+    },
   );
 }
