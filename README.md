@@ -14,6 +14,75 @@ A descriptive reading room for US campaign documents (2016 to 2024) and 179 deba
 
 ---
 
+## Showcase
+
+![Compare two speakers: a captioned walkthrough of Distinctive words, choosing Hillary Clinton and Bernie Sanders in 2016 and following a word back to its source documents](docs/showcase/compare-two-speakers.gif)
+
+Three scripted walkthroughs and screenshots of every tool. The
+**[guided tour](https://campaign-text-lab.vercel.app/tour)** on the site plays the walkthroughs as
+captioned videos with step-by-step transcripts. Everything here is produced by one Playwright
+script (`web/e2e/showcase.spec.ts`, run with `pnpm showcase`), which also checks each step as an
+end-to-end test.
+
+|                                                                                                                                                                                                                                                                                          |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Landing, paper theme: Headline figures from the original collection and the six tools.](docs/showcase/01-landing-light.png)<br>**Landing, paper theme.** Headline figures from the original collection and the six tools.                                                              | ![Landing, microfilm theme: The same page in the dark theme.](docs/showcase/02-landing-dark.png)<br>**Landing, microfilm theme.** The same page in the dark theme.                                                                                                                                                                                                                                                                                                                                          |
+| ![Explorer: 7,556 documents by candidate, type and month, each linked to its source.](docs/showcase/03-explorer.png)<br>**Explorer.** 7,556 documents by candidate, type and month, each linked to its source.                                                                           | ![Distinctive words: Clinton and Sanders in 2016: Fightin' Words z-scores, word by word.](docs/showcase/04-distinctive-words.png)<br>**Distinctive words.** Clinton and Sanders in 2016: Fightin' Words z-scores, word by word.                                                                                                                                                                                                                                                                             |
+| ![Word-list stability: How often each top word survives 200 document resamples.](docs/showcase/05-word-stability.png)<br>**Word-list stability.** How often each top word survives 200 document resamples.                                                                               | ![Debates, 1960 to 2024: One dot per debate: moderator share, turn length, turn rate and reading grade.](docs/showcase/06-debates.png)<br>**Debates, 1960 to 2024.** One dot per debate: moderator share, turn length, turn rate and reading grade.                                                                                                                                                                                                                                                         |
+| ![One debate, turn by turn: Kennedy and Nixon, Chicago 1960: every turn, share of words and turn lengths.](docs/showcase/07-debate-turns.png)<br>**One debate, turn by turn.** Kennedy and Nixon, Chicago 1960: every turn, share of words and turn lengths.                             | ![Term timeline: Economy mentions per 10,000 words by quarter, with exact Poisson 95% intervals.](docs/showcase/08-term-timeline.png)<br>**Term timeline.** Economy mentions per 10,000 words by quarter, with exact Poisson 95% intervals.                                                                                                                                                                                                                                                                 |
+| ![Readability: Reading-grade trends with cluster-bootstrap intervals.](docs/showcase/09-readability.png)<br>**Readability.** Reading-grade trends with cluster-bootstrap intervals.                                                                                                      | ![Bring your own key: AI settings: the visitor's own key, kept in the browser and sent only to the provider.](docs/showcase/10-byok-settings.png)<br>**Bring your own key.** AI settings: the visitor's own key, kept in the browser and sent only to the provider.                                                                                                                                                                                                                                         |
+| ![LLM against keyword rules: Paired scores with intervals on the same excerpts (mocked AI response for illustration).](docs/showcase/11-topic-evaluation.png)<br>**LLM against keyword rules.** Paired scores with intervals on the same excerpts (mocked AI response for illustration). | ![AI audit log: Every call with prompt, answer, latency, tokens and the human decision.](docs/showcase/12-ai-audit-log.png)<br>**AI audit log.** Every call with prompt, answer, latency, tokens and the human decision.                                                                                                                                                                                                                                                                                    |
+| ![Methods: Provenance, statistics, the AI use statement, model card and decision records.](docs/showcase/13-methods.png)<br>**Methods.** Provenance, statistics, the AI use statement, model card and decision records.                                                                  | <img src="docs/showcase/14-mobile-landing.png" width="128" alt="Phone: landing: The landing page at 390 px."> <img src="docs/showcase/15-mobile-distinctive.png" width="128" alt="Phone: distinctive words: Word lists stack on a phone."> <img src="docs/showcase/16-mobile-debate.png" width="128" alt="Phone: a debate, dark theme: Share of words and turn lengths for the 2024 Philadelphia debate."><br>**On a phone (390 px).** The landing page, distinctive words, and a debate in the dark theme. |
+
+### Workflow walkthrough
+
+Each numbered step is a caption in the recording, in order.
+
+1. **Compare two speakers** ([video](https://campaign-text-lab.vercel.app/tour#compare-two-speakers), [try it](https://campaign-text-lab.vercel.app/distinctive)). Pick two candidates and see the words that most set them apart, with z-scores, a stability check and links back to the source documents.
+
+   1. Distinctive words compares the vocabulary of any two groups of campaign documents.
+   2. Group A: choose a candidate, Hillary Clinton, and the 2016 cycle.
+   3. Group B: Bernie Sanders, in the same cycle.
+   4. Each side's document count and indexed words, and how many words pass |z| = 1.96.
+   5. Every word gets a Fightin' Words z-score; the funnel plot shows all of them at once.
+   6. The ranked lists: a z-score bar and uses per 10,000 words in each group.
+   7. Select a word to see the documents in each group that use it most.
+   8. Every example links back to the full text on The American Presidency Project.
+   9. Resampling documents 200 times shows how stable each top word is.
+
+2. **Sixty years of debates** ([video](https://campaign-text-lab.vercel.app/tour#sixty-years-of-debates), [try it](https://campaign-text-lab.vercel.app/debates)). Talk share and turn length by participant, from Kennedy and Nixon in 1960 to Harris and Trump in 2024.
+
+   ![Sixty years of debates: captioned walkthrough](docs/showcase/sixty-years-of-debates.gif)
+
+   1. 179 debate transcripts from 1960 to 2024, split into 44,255 speaking turns.
+   2. One dot per debate: the share of words spoken by moderators and panellists.
+   3. Switch the measure to words per candidate turn: turns have shortened since the 1960s.
+   4. Select a dot to open a debate: Kennedy and Nixon in Chicago, 26 September 1960.
+   5. The debate turn by turn: each block is one turn, as wide as it is long.
+   6. Share of words, a stand-in for talk time, and the length of every turn by speaker.
+   7. Back to the overview to jump 64 years ahead.
+   8. Harris and Trump in Philadelphia, 10 September 2024.
+   9. Four times as many candidate turns, averaging 123 words where 1960 averaged 328.
+
+3. **Classical vs LLM topic labels** ([video](https://campaign-text-lab.vercel.app/tour#classical-vs-llm-topic-labels), [try it](https://campaign-text-lab.vercel.app/topics)). A transparent keyword dictionary against a language model on the same gold-labelled excerpts, with intervals, a paired test, human review and an audit log.
+
+   ![Classical vs LLM topic labels: captioned walkthrough](docs/showcase/classical-vs-llm-topic-labels.gif)
+
+   > **Mocked AI response for illustration.** The model output in this walkthrough is a mocked response for illustration: the recording intercepts the request in the browser, so no API key is used and no provider is called. Its scores say nothing about any model.
+   1. Topic labels: a keyword dictionary and a language model label the same gold-labelled excerpts.
+   2. The keyword baseline runs for everyone: agreement and Cohen's kappa with 95% intervals.
+   3. The model is optional and runs on the visitor's own key. Open AI settings.
+   4. Paste a key (here a placeholder, not a real key). It stays in this browser tab.
+   5. Save. Requests go straight from the browser to the provider, never to this site.
+   6. A seeded sample of 40 excerpts, sent in four requests. Mocked AI response for illustration.
+   7. Both labellers scored on the same excerpts: intervals, paired difference and McNemar's test.
+   8. Every label is marked AI-generated. Correct one, then accept the run.
+   9. Every call is in the AI audit log with prompt, answer, latency, tokens and decision.
+
+The GIFs are 960 px wide at 10 frames per second; the MP4 versions on the tour page are sharper.
+Raw recordings stay out of the repository: `pnpm showcase` writes them to `web/.showcase/` and
+`pnpm showcase:media` converts them with ffmpeg, cutting page-load pauses.
+
 ## Overview
 
 In August 2025 I wrote two Jupyter notebooks that collect public pages from The American
@@ -176,7 +245,8 @@ Because the deployment uploads `web/` only, the documents are mirrored into `web
 │   └── _archive/                the first README
 ├── docs/
 │   ├── model-card.md            the two topic labellers
-│   └── decisions/               DR-001 to DR-008 and an index
+│   ├── decisions/               DR-001 to DR-008 and an index
+│   └── showcase/                README screenshots and walkthrough GIFs (pnpm showcase)
 ├── scripts/                     reproducible data build (uv, PEP 723 inline dependencies)
 │   ├── parity_check.py          runs the notebook code offline against the stored HTML/CSV
 │   ├── build_analytics.py       writes web/data/analytics.db and the test fixtures
@@ -189,9 +259,13 @@ Because the deployment uploads `web/` only, the documents are mirrored into `web
 └── web/                         the Next.js app (Vercel root directory)
     ├── data/analytics.db        derived, read-only database (no running text)
     ├── content/                 copies of docs/ for rendering (pnpm sync:docs)
+    ├── e2e/                     the showcase tour: Playwright screenshots and recorded walkthroughs
+    ├── public/showcase/         walkthrough MP4s, posters, WebVTT captions and screenshots for /tour
+    ├── scripts/                 docs sync; showcase-media.mjs turns recordings into MP4, GIF and WebP
     └── src/
         ├── app/                 routes: /, /explorer, /distinctive, /debates, /debates/[slug], /timeline,
-        │                        /readability, /topics, /ai-log, /methods (+ /decisions/[slug], /model-card)
+        │                        /readability, /topics, /ai-log, /methods (+ /decisions/[slug], /model-card),
+        │                        /tour
         ├── components/          ui/ primitives, layout/, charts/, ai/, and one folder per tool
         ├── data/                generated JSON (parity summary, candidate list, topic items and gold labels)
         ├── hooks/               element width, URL-driven filters
@@ -225,6 +299,18 @@ pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build
 
 `pnpm typecheck` runs `next typegen && tsc --noEmit`, because Next 16's global route types
 (`PageProps`, `LayoutProps`) only exist after type generation.
+
+Showcase media (the screenshots, GIFs and the videos on `/tour`):
+
+```bash
+pnpm showcase                                   # against production
+BASE_URL=http://localhost:3536 pnpm showcase    # against a local `pnpm build && pnpm start`
+```
+
+It drives the installed Google Chrome (Playwright channel `chrome`; Playwright's own browsers are
+never downloaded), asserts each step as an end-to-end test, and needs `ffmpeg` and `cwebp` for
+the conversion step. The AI walkthrough never uses a real key: it types a placeholder and answers
+the provider request inside the browser with a mocked response that is labelled on screen.
 
 Deploying: the production site at <https://campaign-text-lab.vercel.app> is the Vercel project
 `campaign-text-lab`, deployed from inside `web/` (`vercel deploy --prod`). It needs no environment
