@@ -143,6 +143,12 @@ MODERATOR_ROLE_KEYS = {"MODERATOR", "MODERATORS", "QUESTIONER", "QUESTION", "Q",
                        "PANELISTS", "PANEL", "HOST"}
 HEADER_LABELS = ("participants", "moderators", "moderator", "panelists", "panelist",
                  "questioners", "panel", "sponsor", "sponsors")
+# Header labels that are also used as speaker labels inside a transcript
+# ("MODERATOR: Speaker Gingrich, since our last debate ...").
+SPEAKER_HEADER_LABELS = {"moderator", "panelist", "questioner"}
+# A names list written on the label's own line, e.g. "Moderator: Anderson Cooper, CNN host".
+NAMES_LINE_MAX_WORDS = 12
+SENTENCE_MARK_RE = re.compile(r"[?!]|\.\s*$")
 
 TAG_LABEL_NAMES = {"b", "strong", "i", "em"}
 CAPS_COLON_RE = re.compile(r"^([A-Z][A-Za-z0-9 .,'\"\-&()/\[\]]{0,90}?):\s+(\S[\s\S]*)$")
@@ -275,16 +281,49 @@ def _segments_of_paragraph(p: Tag) -> list[tuple[str | None, str, str]]:
     return out
 
 
+def is_header_paragraph(p: Tag, turns_started: bool) -> bool:
+    """Is ``p`` part of the page's header block (who took part), not a turn?
+
+    Plural labels ("PARTICIPANTS:", "MODERATORS:", "PANELISTS:") and "SPONSOR:"
+    always head a names list. A singular "MODERATOR:" heads one only when the
+    names start on the next line (``<b>MODERATOR:</b><br/>Bret Baier``), nothing
+    follows the label, or, before the first turn, a short name with no sentence
+    punctuation follows it on the same line ("Moderator: Anderson Cooper, CNN
+    host"). Otherwise it is the moderator speaking and the paragraph is a turn.
+    """
+    bold = p.find(["b", "strong"])
+    if bold is None:
+        return False
+    lt = bold.get_text(strip=True).rstrip(":").strip().lower()
+    if not lt.startswith(HEADER_LABELS):
+        return False
+    if lt not in SPEAKER_HEADER_LABELS:
+        return True
+    if bold.find("br") is not None:
+        return True
+    nxt = bold.next_sibling
+    while isinstance(nxt, NavigableString) and str(nxt).strip() in ("", ":"):
+        nxt = nxt.next_sibling
+    if nxt is None or (isinstance(nxt, Tag) and nxt.name == "br"):
+        return True
+    if turns_started:
+        return False
+    full = re.sub(r"\s+", " ", p.get_text(" ")).strip()
+    label = re.sub(r"\s+", " ", bold.get_text(" ")).strip()
+    rest = full[len(label):].lstrip(" :") if full.startswith(label) else full
+    return len(rest.split()) <= NAMES_LINE_MAX_WORDS and not SENTENCE_MARK_RE.search(rest)
+
+
 def segment_transcript(html: str, year: int) -> tuple[list[Turn], dict]:
     soup = BeautifulSoup(html or "", "html.parser")
     lines: list[tuple[str | None, str, str]] = []
+    turns_started = False
     for p in soup.find_all("p"):
-        bold = p.find(["b", "strong"])
-        if bold is not None:
-            lt = bold.get_text(strip=True).rstrip(":").strip().lower()
-            if lt.startswith(HEADER_LABELS):
-                continue
-        lines.extend(_segments_of_paragraph(p))
+        if is_header_paragraph(p, turns_started):
+            continue
+        segs = _segments_of_paragraph(p)
+        turns_started = turns_started or any(tl for tl, _, _ in segs)
+        lines.extend(segs)
 
     # Decide whether the full-stop label style is in use for this transcript.
     tag_hits = sum(1 for tl, _, _ in lines if tl)

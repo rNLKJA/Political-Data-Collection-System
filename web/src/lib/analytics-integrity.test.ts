@@ -1,6 +1,7 @@
 /**
  * Regression checks on the built analytics database (scripts/build_analytics.py):
- * who counts as a debate candidate, and what the topic snippets may quote.
+ * who counts as a debate candidate, how much the moderators said, how the two
+ * party topics are defined, and what the topic snippets may quote.
  */
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -88,6 +89,56 @@ describe("debate roles", () => {
          FROM debates d`,
     );
     expect(r.filter((x) => x.n !== x.c)).toEqual([]);
+  });
+});
+
+describe("moderator turns", () => {
+  it("keeps inline MODERATOR: turns (Sioux City, 15 December 2011)", () => {
+    const r = rows<{ turns: number; words: number; share: number }>(
+      `SELECT s.turns, s.words, s.share FROM debate_speakers s JOIN debates d ON d.id = s.debate_id
+        WHERE d.date = '2011-12-15' AND d.url LIKE '%sioux-city%' AND s.role = 'moderator'`,
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0].turns).toBeGreaterThanOrEqual(95);
+    expect(r[0].share).toBeGreaterThan(0.15);
+  });
+
+  it("gives the moderators at least 2% of the words in every debate", () => {
+    const r = rows<{ url: string; share: number }>(
+      `SELECT url, 1.0 * moderator_words / words AS share FROM debates
+        WHERE 1.0 * moderator_words / words < 0.02`,
+    );
+    expect(r).toEqual([]);
+  });
+});
+
+describe("party topics", () => {
+  const patterns = (slug: string) =>
+    JSON.parse(
+      rows<{ patterns: string }>("SELECT patterns FROM concepts WHERE slug = ?", slug)[0].patterns,
+    ) as string[];
+  const total = (slug: string) =>
+    rows<{ n: number }>(
+      `SELECT SUM(h.n) AS n FROM concept_hits h JOIN concepts c ON c.id = h.concept_id
+        WHERE c.slug = ?`,
+      slug,
+    )[0].n;
+
+  it("define both parties the same way", () => {
+    const dem = patterns("democrats");
+    const rep = patterns("republicans");
+    // Noun and party adjective, single words, counted only when capitalised.
+    for (const pats of [dem, rep]) {
+      expect(pats.every((p) => /^[A-Z][a-z]+$/.test(p))).toBe(true);
+    }
+    expect([...dem].sort()).toEqual(["Democrat", "Democratic", "Democrats"]);
+    // "Republican" is both the noun and the party adjective.
+    expect([...rep].sort()).toEqual(["Republican", "Republicans"]);
+  });
+
+  it("count the capitalised party adjective (“Democratic Party”, “Democratic primary”)", () => {
+    expect(total("democrats")).toBeGreaterThan(6000);
+    expect(total("republicans")).toBeGreaterThan(5000);
   });
 });
 

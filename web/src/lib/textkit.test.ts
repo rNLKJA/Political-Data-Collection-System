@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   cleanDocument,
+  conceptRanges,
   countSentences,
   fleschKincaid,
   matchConcept,
@@ -81,6 +82,35 @@ describe("matchConcept", () => {
     expect(matchConcept(toks, ["wage", "wages", "minimum wage"])).toEqual([
       [2, 2],
       [5, 1],
+    ]);
+  });
+  it("needs a capital letter in the source for a capitalised pattern word", () => {
+    const text = "Democratic primary voters want democratic values; Democrats agree";
+    const toks = tokenize(text);
+    const lower = toks.map((t) => t.text);
+    const cased = toks.map((t) => text.slice(t.start, t.end));
+    const party = ["Democrat", "Democrats", "Democratic"];
+    expect(matchConcept(lower, party, cased)).toEqual([
+      [0, 1],
+      [6, 1],
+    ]);
+    // Without the source spelling a capitalised pattern word never matches.
+    expect(matchConcept(lower, party)).toEqual([]);
+    // Lower-case patterns ignore case as before.
+    expect(matchConcept(lower, ["voters"], cased)).toEqual([[2, 1]]);
+  });
+});
+
+describe("conceptRanges", () => {
+  it("finds every use of a topic in a snippet and keeps the stored range", () => {
+    const s = "… the economy is strong and our economic plan works …";
+    const ranges = conceptRanges(s, ["economy", "economic", "economies"], [32, 40]);
+    expect(ranges.map(([a, b]) => s.slice(a, b))).toEqual(["economy", "economic"]);
+  });
+  it("respects capitalised party patterns", () => {
+    const s = "the Republican nominee and a republican form of government";
+    expect(conceptRanges(s, ["Republican", "Republicans"]).map(([a, b]) => s.slice(a, b))).toEqual([
+      "Republican",
     ]);
   });
 });
