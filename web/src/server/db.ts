@@ -19,14 +19,18 @@ export function getDb(): DatabaseSync {
   return globalForDb.__ctlDb;
 }
 
+// node:sqlite returns null-prototype rows; React refuses to pass those to
+// Client Components, so copy them into plain objects.
 export function all<T>(sql: string, ...params: SQLInputValue[]): T[] {
   return getDb()
     .prepare(sql)
-    .all(...params) as T[];
+    .all(...params)
+    .map((row) => ({ ...row })) as T[];
 }
 
 export function get<T>(sql: string, ...params: SQLInputValue[]): T | undefined {
-  return getDb()
+  const row = getDb()
     .prepare(sql)
-    .get(...params) as T | undefined;
+    .get(...params);
+  return row ? ({ ...row } as T) : undefined;
 }

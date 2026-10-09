@@ -43,14 +43,20 @@ export function Section({
 }) {
   const headingId = id ? `${id}-heading` : undefined;
   return (
-    <section id={id} aria-labelledby={headingId} className={cn("mx-auto max-w-6xl px-4 sm:px-6", className)}>
+    <section
+      id={id}
+      aria-labelledby={headingId}
+      className={cn("mx-auto max-w-6xl px-4 sm:px-6", className)}
+    >
       <div className="double-rule pt-5">
         {kicker ? <p className="kicker">{kicker}</p> : null}
         <h2 id={headingId} className="mt-1.5 text-2xl font-medium tracking-tight sm:text-[1.75rem]">
           {title}
         </h2>
         {description ? (
-          <div className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">{description}</div>
+          <div className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </div>
         ) : null}
       </div>
       <div className="mt-6">{children}</div>
@@ -60,7 +66,12 @@ export function Section({
 
 export function Panel({ className, children }: { className?: string; children: React.ReactNode }) {
   return (
-    <div className={cn("rounded-lg border border-border bg-card p-4 shadow-[0_1px_0_rgb(0_0_0/0.03)] sm:p-5", className)}>
+    <div
+      className={cn(
+        "rounded-lg border border-border bg-card p-4 shadow-[0_1px_0_rgb(0_0_0/0.03)] sm:p-5",
+        className,
+      )}
+    >
       {children}
     </div>
   );

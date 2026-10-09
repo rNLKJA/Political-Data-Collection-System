@@ -8,7 +8,11 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-        <Link href="/" className="group flex items-baseline gap-2" aria-label={`${SITE.name}, home`}>
+        <Link
+          href="/"
+          className="group flex items-baseline gap-2"
+          aria-label={`${SITE.name}, home`}
+        >
           <span
             aria-hidden
             className="grid size-7 place-items-center self-center rounded-sm border border-rule font-serif text-[0.95rem] leading-none font-semibold italic"

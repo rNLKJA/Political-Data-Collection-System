@@ -1,26 +1,53 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  parseDistinctiveParams,
-  parseExplorerParams,
-  parseTimelineParams,
-} from "@/lib/params";
+import { parseDistinctiveParams, parseExplorerParams, parseTimelineParams } from "@/lib/params";
 
 describe("search parameter parsing", () => {
   it("drops invalid explorer filters instead of failing", () => {
-    const p = parseExplorerParams({ type: "Memo", from: "2016-13", page: "-4", speaker: "Bad Slug!" });
-    expect(p).toEqual({ speaker: undefined, type: undefined, from: undefined, to: undefined, q: undefined, page: 1 });
+    const p = parseExplorerParams({
+      type: "Memo",
+      from: "2016-13",
+      page: "-4",
+      speaker: "Bad Slug!",
+    });
+    expect(p).toEqual({
+      speaker: undefined,
+      type: undefined,
+      from: undefined,
+      to: undefined,
+      q: undefined,
+      page: 1,
+    });
   });
 
   it("keeps valid explorer filters", () => {
-    const p = parseExplorerParams({ type: "Statement", from: "2016-01", to: "2020-12", page: ["3", "9"], q: " jobs " });
-    expect(p).toMatchObject({ type: "Statement", from: "2016-01", to: "2020-12", page: 3, q: "jobs" });
+    const p = parseExplorerParams({
+      type: "Statement",
+      from: "2016-01",
+      to: "2020-12",
+      page: ["3", "9"],
+      q: " jobs ",
+    });
+    expect(p).toMatchObject({
+      type: "Statement",
+      from: "2016-01",
+      to: "2020-12",
+      page: 3,
+      q: "jobs",
+    });
   });
 
   it("defaults the distinctive-words comparison to two cycles", () => {
-    expect(parseDistinctiveParams({})).toMatchObject({ a: "cycle-2016", b: "cycle-2024", prior: 10_000 });
+    expect(parseDistinctiveParams({})).toMatchObject({
+      a: "cycle-2016",
+      b: "cycle-2024",
+      prior: 10_000,
+    });
     expect(parseDistinctiveParams({ prior: "7" }).prior).toBe(10_000);
-    expect(parseDistinctiveParams({ a: "ted-cruz@2016", b: "rest" })).toMatchObject({ a: "ted-cruz@2016", b: "rest" });
+    expect(parseDistinctiveParams({ a: "ted-cruz@2016", b: "rest" })).toMatchObject({
+      a: "ted-cruz@2016",
+      b: "rest",
+    });
   });
 
   it("caps the timeline at three speakers", () => {

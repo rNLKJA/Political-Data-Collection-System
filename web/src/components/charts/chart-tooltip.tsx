@@ -37,14 +37,29 @@ export function ChartTooltip({
   );
 }
 
-export function LegendSwatch({ color, shape = "square" }: { color: string; shape?: "square" | "line" | "dot" }) {
+export function LegendSwatch({
+  color,
+  shape = "square",
+}: {
+  color: string;
+  shape?: "square" | "line" | "dot";
+}) {
   if (shape === "line") {
-    return <span aria-hidden className="inline-block h-0.5 w-4 rounded-full align-middle" style={{ background: color }} />;
+    return (
+      <span
+        aria-hidden
+        className="inline-block h-0.5 w-4 rounded-full align-middle"
+        style={{ background: color }}
+      />
+    );
   }
   return (
     <span
       aria-hidden
-      className={cn("inline-block size-2.5 align-middle", shape === "dot" ? "rounded-full" : "rounded-[2px]")}
+      className={cn(
+        "inline-block size-2.5 align-middle",
+        shape === "dot" ? "rounded-full" : "rounded-[2px]",
+      )}
       style={{ background: color }}
     />
   );

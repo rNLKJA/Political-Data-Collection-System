@@ -46,14 +46,19 @@ export function MonthlyColumns({
         height={height}
         role="img"
         aria-label={label}
-        className="block overflow-visible"
+        className="block max-w-full overflow-visible"
         onMouseLeave={() => setHover(null)}
       >
         <g transform={`translate(${m.left},${m.top})`}>
           {niceTicks(0, yMax, 4).map((t) => (
             <g key={t} transform={`translate(0,${y(t)})`}>
               <line x2={innerW} stroke="var(--chart-grid)" strokeWidth={1} />
-              <text x={-8} dy="0.32em" textAnchor="end" className="fill-muted-foreground font-mono text-[10px] tabular">
+              <text
+                x={-8}
+                dy="0.32em"
+                textAnchor="end"
+                className="tabular fill-muted-foreground font-mono text-[10px]"
+              >
                 {formatTick(t)}
               </text>
             </g>
@@ -67,7 +72,9 @@ export function MonthlyColumns({
               <path
                 key={months[i]}
                 d={`M${x},${innerH} V${innerH - h + r} Q${x},${innerH - h} ${x + r},${innerH - h} H${x + barW - r} Q${x + barW},${innerH - h} ${x + barW},${innerH - h + r} V${innerH} Z`}
-                fill={hover === null || hover === i ? "var(--role-candidate)" : "var(--chart-muted)"}
+                fill={
+                  hover === null || hover === i ? "var(--role-candidate)" : "var(--chart-muted)"
+                }
               />
             );
           })}
@@ -78,7 +85,7 @@ export function MonthlyColumns({
                 key={mo}
                 x={i * band}
                 y={innerH + 17}
-                className="fill-muted-foreground font-mono text-[10px] tabular"
+                className="tabular fill-muted-foreground font-mono text-[10px]"
               >
                 {mo.slice(0, 4)}
               </text>
@@ -99,7 +106,11 @@ export function MonthlyColumns({
         </g>
       </svg>
       {hover !== null ? (
-        <ChartTooltip x={m.left + hover * band + band / 2} y={m.top + y(values[hover])} width={width}>
+        <ChartTooltip
+          x={m.left + hover * band + band / 2}
+          y={m.top + y(values[hover])}
+          width={width}
+        >
           <p className="font-medium">{formatMonth(months[hover])}</p>
           <p className="tabular text-muted-foreground">
             {formatInt(values[hover])} {unit}

@@ -151,7 +151,10 @@ export function ToolCard({
       <span className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{children}</span>
       <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
         Open
-        <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
+        <ArrowUpRight
+          className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+          aria-hidden
+        />
       </span>
     </Link>
   );
@@ -164,7 +167,13 @@ export function BarList({
   color = "var(--role-candidate)",
   max,
 }: {
-  items: Array<{ key: string; label: React.ReactNode; value: number; note?: React.ReactNode; color?: string }>;
+  items: Array<{
+    key: string;
+    label: React.ReactNode;
+    value: number;
+    note?: React.ReactNode;
+    color?: string;
+  }>;
   format?: (v: number) => string;
   color?: string;
   max?: number;
@@ -173,17 +182,23 @@ export function BarList({
   return (
     <ul className="space-y-2.5">
       {items.map((it) => (
-        <li key={it.key} className="grid grid-cols-[minmax(0,10rem)_1fr_auto] items-center gap-3 text-sm sm:grid-cols-[minmax(0,13rem)_1fr_auto]">
+        <li
+          key={it.key}
+          className="grid grid-cols-[minmax(0,9rem)_minmax(3rem,1fr)_auto] items-center gap-3 text-sm sm:grid-cols-[minmax(0,12rem)_minmax(4rem,1fr)_auto]"
+        >
           <span className="truncate" title={typeof it.label === "string" ? it.label : undefined}>
             {it.label}
           </span>
           <span className="relative h-2.5 rounded-full bg-muted" aria-hidden>
             <span
               className="absolute inset-y-0 left-0 rounded-full"
-              style={{ width: `${Math.max(0.5, (it.value / top) * 100)}%`, background: it.color ?? color }}
+              style={{
+                width: `${Math.max(0.5, (it.value / top) * 100)}%`,
+                background: it.color ?? color,
+              }}
             />
           </span>
-          <span className="tabular w-20 text-right text-muted-foreground">
+          <span className="tabular min-w-12 text-right text-muted-foreground">
             {format(it.value)}
             {it.note ? <span className="block text-[0.7rem]">{it.note}</span> : null}
           </span>

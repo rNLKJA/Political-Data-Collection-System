@@ -121,7 +121,13 @@ export function ExplorerFilters({
             type="button"
             onClick={() => {
               setQ("");
-              go({ speaker: undefined, type: undefined, from: undefined, to: undefined, q: undefined });
+              go({
+                speaker: undefined,
+                type: undefined,
+                from: undefined,
+                to: undefined,
+                q: undefined,
+              });
             }}
             className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
           >

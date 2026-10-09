@@ -24,7 +24,11 @@ export function ThemeToggle() {
       title={mounted ? label : undefined}
       className="inline-flex size-9 items-center justify-center rounded-md border border-border/80 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     >
-      {dark ? <ScrollText className="size-4" aria-hidden /> : <Film className="size-4" aria-hidden />}
+      {dark ? (
+        <ScrollText className="size-4" aria-hidden />
+      ) : (
+        <Film className="size-4" aria-hidden />
+      )}
     </button>
   );
 }

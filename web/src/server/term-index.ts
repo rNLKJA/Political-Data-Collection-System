@@ -31,9 +31,13 @@ const g = globalThis as unknown as { __ctlIndex?: Index };
 function buildIndex(): Index {
   const months = allMonths();
   const monthIdx = new Map(months.map((m, i) => [m, i]));
-  const docRows = all<{ id: number; speaker_id: number; cycle: number; month: string; tokens: number }>(
-    "SELECT id, speaker_id, cycle, month, tokens FROM documents ORDER BY id",
-  );
+  const docRows = all<{
+    id: number;
+    speaker_id: number;
+    cycle: number;
+    month: string;
+    tokens: number;
+  }>("SELECT id, speaker_id, cycle, month, tokens FROM documents ORDER BY id");
   const nDocs = docRows.length;
   const speaker = new Int16Array(nDocs);
   const cycle = new Int16Array(nDocs);
@@ -214,24 +218,29 @@ export function computeFightinWords(
     delta: res.delta[t],
     z: res.z[t],
   });
-  const topA = order.slice(0, top).filter((t) => res.z[t] > 0).map(word);
+  const topA = order
+    .slice(0, top)
+    .filter((t) => res.z[t] > 0)
+    .map(word);
   const topB = order
     .slice(-top)
     .reverse()
     .filter((t) => res.z[t] < 0)
     .map(word);
 
-  // Funnel plot sample: every clearly distinctive word plus an even sample of the rest.
+  // Funnel plot sample (about 1,200 points): the 120 strongest words on each
+  // side plus an even sample of the rest, so the payload stays small.
   const cloud: FightinWordsView["cloud"] = [];
   let significant = 0;
-  const stride = Math.max(1, Math.floor(order.length / 1500));
+  for (const t of order) if (Math.abs(res.z[t]) >= Z_THRESHOLD) significant++;
+  const stride = Math.max(1, Math.floor(order.length / 950));
   order.forEach((t, rank) => {
     const z = res.z[t];
     const sig = Math.abs(z) >= Z_THRESHOLD;
-    if (sig) significant++;
-    if ((sig && Math.abs(z) >= 3) || rank % stride === 0) {
+    const extreme = rank < 120 || rank >= order.length - 120;
+    if (extreme || rank % stride === 0) {
       cloud.push([
-        Math.log10(yA[t] + yB[t]),
+        Math.round(Math.log10(yA[t] + yB[t]) * 1000) / 1000,
         Math.round(z * 100) / 100,
         sig ? (z > 0 ? 1 : 2) : 0,
       ]);
@@ -313,7 +322,12 @@ export interface TimelineSeries {
   label: string;
   points: TimelinePoint[];
   total: { k: number; words: number; rate: number; lower: number; upper: number };
+  /** periods with some text but fewer than MIN_PERIOD_WORDS, left off the chart */
+  hidden: number;
 }
+
+/** Periods with less text than this are too thin to plot a rate for. */
+export const MIN_PERIOD_WORDS = 5_000;
 
 function periodOf(month: string, gran: Granularity): string {
   const [y, m] = month.split("-");
@@ -355,10 +369,15 @@ export function buildTimeline(
     const points: TimelinePoint[] = [];
     let kt = 0;
     let wt = 0;
+    let hidden = 0;
     periods.forEach((period, i) => {
       kt += k[i];
       wt += words[i];
       if (words[i] <= 0) return;
+      if (words[i] < MIN_PERIOD_WORDS) {
+        hidden++;
+        return;
+      }
       const r = rateWithInterval(k[i], words[i]);
       points.push({
         period,
@@ -376,8 +395,14 @@ export function buildTimeline(
       label: sp?.name ?? "All speakers",
       points,
       total: { k: kt, words: wt, ...tot },
+      hidden,
     };
   });
+}
+
+/** Every period between the first and last document, including empty ones. */
+export function timelinePeriods(gran: Granularity): string[] {
+  return Array.from(new Set(getIndex().months.map((m) => periodOf(m, gran))));
 }
 
 export function termPerDoc(term: string): Map<number, number> {

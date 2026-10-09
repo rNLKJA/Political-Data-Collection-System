@@ -11,7 +11,13 @@ import { DOC_TYPE_NOTE, type DocType } from "@/lib/corpus-types";
 import { formatCompact, formatDate, formatDecimal, formatInt, formatMonth } from "@/lib/format";
 import { parseExplorerParams, type ExplorerParams } from "@/lib/params";
 import { buildHref } from "@/lib/url";
-import { allMonths, exploreDocuments, getSpeakers, PAGE_SIZE, speakerBySlug } from "@/server/corpus";
+import {
+  allMonths,
+  exploreDocuments,
+  getSpeakers,
+  PAGE_SIZE,
+  speakerBySlug,
+} from "@/server/corpus";
 
 export const metadata: Metadata = {
   title: "Explorer",
@@ -49,7 +55,11 @@ function stateOf(p: ExplorerParams): Record<string, string | undefined> {
   };
 }
 
-async function ExplorerResults({ searchParams }: { searchParams: PageProps<"/explorer">["searchParams"] }) {
+async function ExplorerResults({
+  searchParams,
+}: {
+  searchParams: PageProps<"/explorer">["searchParams"];
+}) {
   const params = parseExplorerParams(await searchParams);
   const speaker = speakerBySlug(params.speaker);
   const result = exploreDocuments(
@@ -93,7 +103,11 @@ async function ExplorerResults({ searchParams }: { searchParams: PageProps<"/exp
       ) : (
         <>
           <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
-            <StatTile label="Documents" value={formatInt(result.total)} note="of 7,556 de-duplicated" />
+            <StatTile
+              label="Documents"
+              value={formatInt(result.total)}
+              note="of 7,556 de-duplicated"
+            />
             <StatTile label="Words (original count)" value={formatCompact(result.words)} />
             <StatTile
               label="Median reading grade"
@@ -102,7 +116,11 @@ async function ExplorerResults({ searchParams }: { searchParams: PageProps<"/exp
             />
             <StatTile
               label="Span"
-              value={first && last ? `${formatMonth(first).slice(-4)}–${formatMonth(last).slice(-4)}` : "–"}
+              value={
+                first && last
+                  ? `${formatMonth(first).slice(-4)}–${formatMonth(last).slice(-4)}`
+                  : "–"
+              }
               note={first && last ? `${formatMonth(first)} to ${formatMonth(last)}` : undefined}
             />
           </div>
@@ -185,23 +203,30 @@ async function ExplorerResults({ searchParams }: { searchParams: PageProps<"/exp
               <DocumentList
                 rows={result.rows}
                 start={(result.page - 1) * PAGE_SIZE + 1}
-                speakerHref={(slug) => buildHref("/explorer", { ...state, speaker: slug, page: undefined })}
+                speakerHref={(slug) =>
+                  buildHref("/explorer", { ...state, speaker: slug, page: undefined })
+                }
               />
             </div>
             <Pagination
               page={result.page}
               pages={result.pages}
-              href={(p) => buildHref("/explorer", { ...state, page: p > 1 ? String(p) : undefined })}
+              href={(p) =>
+                buildHref("/explorer", { ...state, page: p > 1 ? String(p) : undefined })
+              }
             />
           </section>
 
           <Callout title="Reading these numbers">
             Counts reflect what the APP archive filed in its campaign-documents category, not
             everything a campaign published; some campaigns posted far more press releases than
-            others. Word counts are the scraper&apos;s originals. Reading grades use only text in the
-            candidate&apos;s own voice: interviewer, audience and moderator turns inside transcripts
-            are left out (see <Link href="/method#attribution" className="inline-link">Method</Link>).
-            Dates run from {formatDate("2016-01-01")} to {formatDate("2024-11-06")}.
+            others. Word counts are the scraper&apos;s originals. Reading grades use only text in
+            the candidate&apos;s own voice: interviewer, audience and moderator turns inside
+            transcripts are left out (see{" "}
+            <Link href="/method#attribution" className="inline-link">
+              Method
+            </Link>
+            ). Dates run from {formatDate("2016-01-01")} to {formatDate("2024-11-06")}.
           </Callout>
         </>
       )}

@@ -18,7 +18,7 @@ const newsreader = Newsreader({
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
-  subsets: ["latin", "latin-ext"],
+  subsets: ["latin", "latin-ext", "greek"],
   weight: ["400", "500", "600"],
   display: "swap",
 });

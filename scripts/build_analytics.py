@@ -41,6 +41,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from debatekit import (  # noqa: E402
+    CANDIDATES,
     cycle_of,
     is_interrupted,
     role_of,
@@ -563,6 +564,13 @@ def write_fixtures(doc_info: dict) -> None:
     (FIXTURES / "poisson-ci.json").write_text(json.dumps(ci, indent=1) + "\n")
 
 
+def write_candidate_list() -> None:
+    """The curated candidate list, for display on the Method page."""
+    out = ROOT / "web" / "src" / "data" / "debate-candidates.json"
+    data = {str(c): sorted(display_name(k) for k in keys) for c, keys in sorted(CANDIDATES.items())}
+    out.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n")
+
+
 def main() -> int:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     if DB_PATH.exists():
@@ -592,6 +600,7 @@ def main() -> int:
     con.close()
 
     write_fixtures(docs)
+    write_candidate_list()
     size = DB_PATH.stat().st_size
     print(json.dumps(meta, indent=2))
     print(f"wrote {DB_PATH.relative_to(ROOT)} ({size / 1e6:.2f} MB)")

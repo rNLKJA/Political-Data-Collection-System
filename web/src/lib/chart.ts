@@ -47,7 +47,10 @@ export function quantile(sorted: number[], q: number): number {
 }
 
 export function median(values: number[]): number {
-  return quantile([...values].sort((a, b) => a - b), 0.5);
+  return quantile(
+    [...values].sort((a, b) => a - b),
+    0.5,
+  );
 }
 
 /** Calendar position of "YYYY-MM-DD" (or "YYYY-MM") as a fractional year. */

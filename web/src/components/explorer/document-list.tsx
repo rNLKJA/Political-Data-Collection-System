@@ -27,7 +27,10 @@ export function DocumentList({
           <div className="min-w-0">
             <p className="font-serif text-[1.05rem] leading-snug">{d.title}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              <Link href={speakerHref(d.speakerSlug)} className="hover:text-foreground hover:underline">
+              <Link
+                href={speakerHref(d.speakerSlug)}
+                className="hover:text-foreground hover:underline"
+              >
                 {d.speaker}
               </Link>
               <span aria-hidden> · </span>
@@ -75,7 +78,10 @@ export function Pagination({
         <span key={n} className="flex items-center gap-2">
           {i > 0 && n - nums[i - 1] > 1 ? <span className="text-muted-foreground">…</span> : null}
           {n === page ? (
-            <span aria-current="page" className={`${linkCls} border-primary bg-primary text-primary-foreground hover:bg-primary`}>
+            <span
+              aria-current="page"
+              className={`${linkCls} border-primary bg-primary text-primary-foreground hover:bg-primary`}
+            >
               {n}
             </span>
           ) : (

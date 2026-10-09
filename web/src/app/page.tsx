@@ -56,10 +56,26 @@ export default function HomePage() {
             </div>
           </div>
           <dl className="grid grid-cols-2 content-start gap-x-6 gap-y-7 border-t border-rule/60 pt-6 lg:border-t-0 lg:border-l lg:pt-1 lg:pl-8">
-            <StatTile label="Campaign documents" value={formatInt(o.documents)} note={`${o.speakers} speakers, 2016 to 2024`} />
-            <StatTile label="Words in candidates' own voice" value={formatCompact(o.tokens)} note="after removing other speakers" />
-            <StatTile label="Debate transcripts" value={formatInt(o.debates)} note={`${general} general-election and VP, ${o.debates - general} primary`} />
-            <StatTile label="Speaking turns" value={formatInt(o.debateTurns)} note={`${formatCompact(o.debateWords)} words, 1960 to 2024`} />
+            <StatTile
+              label="Campaign documents"
+              value={formatInt(o.documents)}
+              note={`${o.speakers} speakers, 2016 to 2024`}
+            />
+            <StatTile
+              label="Words in candidates' own voice"
+              value={formatCompact(o.tokens)}
+              note="after removing other speakers"
+            />
+            <StatTile
+              label="Debate transcripts"
+              value={formatInt(o.debates)}
+              note={`${general} general-election and VP, ${o.debates - general} primary`}
+            />
+            <StatTile
+              label="Speaking turns"
+              value={formatInt(o.debateTurns)}
+              note={`${formatCompact(o.debateWords)} words, 1960 to 2024`}
+            />
           </dl>
         </div>
       </section>
@@ -77,7 +93,11 @@ export default function HomePage() {
             general election after.
           </p>
           <div className="mt-4">
-            <MonthlyColumns months={months} counts={counts} label="Column chart of campaign documents per month, 2016 to 2024" />
+            <MonthlyColumns
+              months={months}
+              counts={counts}
+              label="Column chart of campaign documents per month, 2016 to 2024"
+            />
           </div>
         </Panel>
       </div>
@@ -88,7 +108,11 @@ export default function HomePage() {
             Filter documents by candidate, type, year and title. See the monthly rhythm and open any
             document on the archive.
           </ToolCard>
-          <ToolCard href="/distinctive" index="02 · Distinctive words" title="How two vocabularies differ">
+          <ToolCard
+            href="/distinctive"
+            index="02 · Distinctive words"
+            title="How two vocabularies differ"
+          >
             Compare any two candidates or election cycles with the weighted log-odds method of
             Monroe, Colaresi and Quinn.
           </ToolCard>
@@ -114,10 +138,14 @@ export default function HomePage() {
           <Panel>
             <h3 className="font-serif text-lg">Documents by type</h3>
             <p className="mt-1 mb-4 text-xs text-muted-foreground">
-              Assigned from title words by the scraper; {formatInt(o.listingRows)} listing rows,{" "}
-              {formatInt(o.listingRows - o.documents)} of them duplicates.
+              Assigned from title words by the scraper. Counted once per document: the{" "}
+              {formatInt(o.listingRows)} listing rows include{" "}
+              {formatInt(o.listingRows - o.documents)} duplicates.
             </p>
-            <BarList items={all.byType.map((t) => ({ key: t.docType, label: t.docType, value: t.n }))} format={formatInt} />
+            <BarList
+              items={all.byType.map((t) => ({ key: t.docType, label: t.docType, value: t.n }))}
+              format={formatInt}
+            />
           </Panel>
           <Panel>
             <h3 className="font-serif text-lg">Documents by candidate</h3>
@@ -125,14 +153,21 @@ export default function HomePage() {
               The archive&apos;s own filing; volumes reflect how much each campaign released.
             </p>
             <BarList
-              items={all.bySpeaker.slice(0, 8).map((s) => ({ key: s.slug, label: s.name, value: s.n }))}
+              items={all.bySpeaker
+                .slice(0, 8)
+                .map((s) => ({ key: s.slug, label: s.name, value: s.n }))}
               format={formatInt}
             />
           </Panel>
         </div>
       </Section>
 
-      <Section id="ground-rules" kicker="Ground rules" title="Descriptive by design" className="mt-20">
+      <Section
+        id="ground-rules"
+        kicker="Ground rules"
+        title="Descriptive by design"
+        className="mt-20"
+      >
         <div className="grid gap-8 text-sm leading-relaxed text-muted-foreground md:grid-cols-3">
           <div>
             <p className="font-medium text-foreground">Symmetric</p>
@@ -158,7 +193,12 @@ export default function HomePage() {
         </div>
       </Section>
 
-      <Section id="about" kicker="About this project" title="A personal project, 2025" className="mt-20">
+      <Section
+        id="about"
+        kicker="About this project"
+        title="A personal project, 2025"
+        className="mt-20"
+      >
         <div className="grid gap-10 lg:grid-cols-[1.3fr_1fr]">
           <div className="prose-archive space-y-3">
             <p>
@@ -171,13 +211,14 @@ export default function HomePage() {
             <p>
               In 2026 it was revived as this website. Nothing was re-scraped: a reproducible script
               reads the original CSVs and writes a small read-only SQLite database of derived
-              statistics, which the site queries on the server. The original parsing code was
-              ported to TypeScript and is tested against the original outputs, row for row.
+              statistics, which the site queries on the server. The original parsing code was ported
+              to TypeScript and is tested against the original outputs, row for row.
             </p>
             <p>
-              <span className="font-medium text-foreground">Provenance.</span> The notebooks and CSVs
-              are preserved unchanged in the repository&apos;s <code className="inline">original/</code>{" "}
-              folder. Source texts: {APP_CITATION} Copyright © The American Presidency Project.
+              <span className="font-medium text-foreground">Provenance.</span> The notebooks and
+              CSVs are preserved unchanged in the repository&apos;s{" "}
+              <code className="inline">original/</code> folder. Source texts: {APP_CITATION}{" "}
+              Copyright © The American Presidency Project.
             </p>
           </div>
           <dl className="grid content-start gap-5 text-sm">

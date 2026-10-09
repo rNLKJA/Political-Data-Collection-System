@@ -67,13 +67,7 @@ export const GRANULARITIES = ["month", "quarter", "year"] as const;
 
 const timelineSchema = z.object({
   concept: z.string().regex(CONCEPT_SLUG_RE).optional().catch(undefined),
-  term: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .max(40)
-    .optional()
-    .catch(undefined),
+  term: z.string().trim().toLowerCase().max(40).optional().catch(undefined),
   speakers: z
     .string()
     .max(300)
