@@ -8,7 +8,14 @@ import { Panel } from "@/components/common/page-intro";
 import { TurnStrips } from "@/components/debates/turn-strips";
 import { TurnSwimlane } from "@/components/debates/turn-swimlane";
 import { DEBATE_KIND_LABEL, ROLE_LABEL } from "@/lib/corpus-types";
-import { formatDateLong, formatDecimal, formatInt, formatPercent } from "@/lib/format";
+import {
+  formatDate,
+  formatDateLong,
+  formatDecimal,
+  formatInt,
+  formatPercent,
+  plural,
+} from "@/lib/format";
 import { getDebate, listDebates } from "@/server/debates";
 
 // Every transcript is known at build time. Requiring the complete page to be
@@ -41,7 +48,7 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
   const { slug } = await props.params;
   const found = getDebate(slug);
   if (!found) notFound();
-  const { debate: d, speakers, turns, prev, next } = found;
+  const { debate: d, speakers, turns, twins, prev, next } = found;
   const lengths = new Map<number, number[]>();
   for (const t of turns) {
     const arr = lengths.get(t.speakerIdx) ?? [];
@@ -52,6 +59,7 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
   const shown = ranked.filter((s) => s.turns >= 1).slice(0, 14);
   const candShare = d.words ? d.candidateWords / d.words : 0;
   const modShare = d.words ? d.moderatorWords / d.words : 0;
+  const clipWords = speakers.find((s) => s.key === "CLIP")?.words ?? 0;
 
   return (
     <article>
@@ -73,6 +81,21 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
         <p className="mt-4 text-sm text-muted-foreground">
           Full transcript: <SourceLink href={d.url}>The American Presidency Project</SourceLink>
         </p>
+        {twins.length ? (
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            The archive holds another transcript of this event under the same title. Both were
+            collected and are kept as they are:{" "}
+            {twins.map((t, i) => (
+              <span key={t.slug}>
+                {i ? ", " : ""}
+                <Link href={`/debates/${t.slug}`} className="underline underline-offset-2">
+                  the other version
+                </Link>
+              </span>
+            ))}
+            .
+          </p>
+        ) : null}
       </header>
 
       <div className="mx-auto max-w-6xl space-y-10 px-4 sm:px-6">
@@ -85,7 +108,7 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
           <StatTile
             label="Candidates' share"
             value={formatPercent(candShare, 0)}
-            note={`${d.nCandidates} candidates`}
+            note={plural(d.nCandidates, "candidate")}
           />
           <StatTile
             label="Moderators' share"
@@ -95,7 +118,7 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
           <StatTile
             label="Crosstalk markers"
             value={formatInt(d.crosstalk)}
-            note={`${formatInt(d.interruptedTurns)} turns end on a dash`}
+            note={`${plural(d.interruptedTurns, "turn")} end${d.interruptedTurns === 1 ? "s" : ""} on a dash`}
           />
         </div>
 
@@ -132,7 +155,7 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
                 label: s.display,
                 value: s.share,
                 color: ROLE_COLOR[s.role],
-                note: `${formatInt(s.turns)} turns`,
+                note: plural(s.turns, "turn"),
               }))}
               format={(v) => formatPercent(v)}
             />
@@ -230,6 +253,9 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
             {d.unattributedWords
               ? `${formatInt(d.unattributedWords)} words before the first label are not attributed to anyone. `
               : ""}
+            {clipWords
+              ? `${plural(clipWords, "word")} come from recorded clips played during the debate; they are listed as “Recorded clips” and not counted as anyone’s live speech. `
+              : ""}
             Candidates&apos; reading grade: {formatDecimal(d.fkCandidates)}; moderators&apos;:{" "}
             {formatDecimal(d.fkModerators)}. Grades describe sentence and word length only.
           </Callout>
@@ -243,7 +269,7 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
             <Link href={`/debates/${prev.slug}`} className="group flex items-start gap-2 text-sm">
               <ArrowLeft className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
-                <span className="kicker block">Earlier</span>
+                <span className="kicker block">Earlier · {formatDate(prev.date)}</span>
                 <span className="font-serif group-hover:underline">{prev.title}</span>
               </span>
             </Link>
@@ -257,7 +283,7 @@ export default async function DebatePage(props: PageProps<"/debates/[slug]">) {
             >
               <ArrowRight className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
-                <span className="kicker block">Later</span>
+                <span className="kicker block">Later · {formatDate(next.date)}</span>
                 <span className="font-serif group-hover:underline">{next.title}</span>
               </span>
             </Link>

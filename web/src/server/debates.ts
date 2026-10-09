@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { DebateKind, Role } from "@/lib/corpus-types";
-import { slugify } from "@/lib/format";
+import { debateSlugs } from "@/lib/debate-slug";
 import { all } from "@/server/db";
 
 export interface DebateSummary {
@@ -88,11 +88,12 @@ export function listDebates(): DebateSummary[] {
     e.words += s.words;
     byDebate.set(s.debate_id, e);
   }
-  cache = rows.map((r) => {
+  const slugs = debateSlugs(rows);
+  cache = rows.map((r, i) => {
     const c = byDebate.get(r.id);
     return {
       ...r,
-      slug: `${r.date}-${slugify(r.title)}`.slice(0, 96).replace(/-+$/, ""),
+      slug: slugs[i],
       candidates: c?.names ?? [],
       meanCandidateTurn: c && c.turns ? c.words / c.turns : 0,
     };
@@ -116,21 +117,16 @@ export function getDebate(slug: string) {
        FROM debate_turns WHERE debate_id = ? ORDER BY seq`,
     debate.id,
   );
+  // The archive holds a second transcript of a few events (same date and title).
+  const twins = list.filter(
+    (d) => d.id !== debate.id && d.date === debate.date && d.title === debate.title,
+  );
   return {
     debate,
     speakers,
     turns,
+    twins,
     prev: i > 0 ? list[i - 1] : null,
     next: i < list.length - 1 ? list[i + 1] : null,
   };
-}
-
-/** Candidate turn lengths for every debate (for the distribution chart). */
-export function candidateTurnLengths(debateId: number): number[] {
-  return all<{ words: number }>(
-    `SELECT t.words FROM debate_turns t
-       JOIN debate_speakers s ON s.debate_id = t.debate_id AND s.idx = t.speaker_idx
-      WHERE t.debate_id = ? AND s.role = 'candidate'`,
-    debateId,
-  ).map((r) => r.words);
 }

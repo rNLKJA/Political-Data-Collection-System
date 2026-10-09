@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { ChartTooltip, LegendSwatch } from "@/components/charts/chart-tooltip";
 import { useElementWidth } from "@/hooks/use-element-width";
@@ -65,6 +65,9 @@ export function DebateTrend({ points }: { points: TrendPoint[] }) {
   const router = useRouter();
   const [metric, setMetric] = useState<MetricKey>("moderatorShare");
   const [hover, setHover] = useState<number | null>(null);
+  // Roving focus: the chart is one Tab stop; arrow keys move between debates.
+  const [active, setActive] = useState(0);
+  const svgRef = useRef<SVGSVGElement>(null);
   const [ref, width] = useElementWidth<HTMLDivElement>(720);
   const def = METRICS.find((m) => m.key === metric)!;
   const height = 320;
@@ -87,6 +90,11 @@ export function DebateTrend({ points }: { points: TrendPoint[] }) {
   const y = linearScale([0, yMax], [innerH, 0]);
   const decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
   const hovered = hover !== null ? data.find((d) => d.i === hover) : undefined;
+  const activeK = Math.min(active, data.length - 1);
+  const focusDot = (k: number) => {
+    const next = Math.max(0, Math.min(data.length - 1, k));
+    svgRef.current?.querySelector<SVGCircleElement>(`[data-k="${next}"]`)?.focus();
+  };
 
   return (
     <div>
@@ -109,14 +117,16 @@ export function DebateTrend({ points }: { points: TrendPoint[] }) {
         ))}
       </div>
       <p className="mt-3 text-sm text-muted-foreground">
-        {def.long}. Each dot is one debate; select a dot to open it.
+        {def.long}. Each dot is one debate; select a dot to open it (arrow keys move between dots),
+        or use the list below.
       </p>
       <div ref={ref} className="relative mt-3">
         <svg
+          ref={svgRef}
           width={width}
           height={height}
-          role="img"
-          aria-label={`Dot plot over time: ${def.long}, one dot per debate from 1960 to 2024`}
+          role="group"
+          aria-label={`Dot plot over time: ${def.long}, one dot per debate from 1960 to 2024. Use the arrow keys to move between debates and Enter to open one.`}
           className="block max-w-full overflow-visible"
           onMouseLeave={() => setHover(null)}
         >
@@ -146,7 +156,7 @@ export function DebateTrend({ points }: { points: TrendPoint[] }) {
                 {d}
               </text>
             ))}
-            {data.map((d) => {
+            {data.map((d, k) => {
               const kind = KINDS.find((k) => k.key === d.p.kind)!;
               return (
                 <circle
@@ -157,9 +167,35 @@ export function DebateTrend({ points }: { points: TrendPoint[] }) {
                   fill={kind.color}
                   stroke="var(--chart-surface)"
                   strokeWidth={2}
-                  className="cursor-pointer"
+                  className="cursor-pointer focus-visible:stroke-[var(--foreground)]"
+                  data-k={k}
+                  tabIndex={k === activeK ? 0 : -1}
+                  role="link"
+                  aria-label={`${d.p.title}, ${formatDate(d.p.date)}: ${def.label.toLowerCase()} ${def.format(d.v)}`}
                   onMouseEnter={() => setHover(d.i)}
+                  onFocus={() => {
+                    setActive(k);
+                    setHover(d.i);
+                  }}
+                  onBlur={() => setHover((h) => (h === d.i ? null : h))}
                   onClick={() => router.push(`/debates/${d.p.slug}`)}
+                  onKeyDown={(e) => {
+                    const step: Record<string, number> = {
+                      ArrowRight: k + 1,
+                      ArrowUp: k + 1,
+                      ArrowLeft: k - 1,
+                      ArrowDown: k - 1,
+                      Home: 0,
+                      End: data.length - 1,
+                    };
+                    if (e.key in step) {
+                      e.preventDefault();
+                      focusDot(step[e.key]);
+                    } else if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      router.push(`/debates/${d.p.slug}`);
+                    }
+                  }}
                 />
               );
             })}
