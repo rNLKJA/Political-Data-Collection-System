@@ -43,3 +43,8 @@ next-env.d.ts
 
 # local test-runner reports
 /.vitest
+
+# showcase tour: raw recordings, screenshots and Playwright output
+/.showcase/
+/test-results/
+/playwright-report/

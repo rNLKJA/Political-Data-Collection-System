@@ -18,7 +18,10 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "sync:docs": "node scripts/sync-docs.mjs"
+    "sync:docs": "node scripts/sync-docs.mjs",
+    "showcase": "pnpm showcase:record && pnpm showcase:media",
+    "showcase:record": "playwright test",
+    "showcase:media": "node scripts/showcase-media.mjs"
   },
   "dependencies": {
     "cn": "^0.4.0",
@@ -36,6 +39,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^24.19.1",
     "@types/papaparse": "^5.5.2",
