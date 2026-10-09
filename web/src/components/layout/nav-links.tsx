@@ -15,7 +15,7 @@ function isActive(pathname: string, href: string) {
 export function NavLinks() {
   const pathname = usePathname();
   return (
-    <ul className="flex items-center gap-1">
+    <ul className="flex items-center gap-0.5 xl:gap-1">
       {NAV.map((item) => {
         const active = isActive(pathname, item.href);
         return (
@@ -24,13 +24,13 @@ export function NavLinks() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "rounded-md px-2.5 py-1.5 text-sm transition-colors",
+                "rounded-md px-2 py-1.5 text-sm whitespace-nowrap transition-colors xl:px-2.5",
                 active
                   ? "bg-secondary font-medium text-foreground"
                   : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
               )}
             >
-              {item.label}
+              {item.short}
             </Link>
           </li>
         );
@@ -75,7 +75,7 @@ export function MobileNav() {
   }, [open]);
 
   return (
-    <div className="md:hidden">
+    <div className="lg:hidden">
       <button
         ref={toggleRef}
         type="button"

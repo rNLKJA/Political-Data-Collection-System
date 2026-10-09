@@ -7,6 +7,7 @@ import { Callout, EmptyState, SourceLink, StatTile } from "@/components/common/b
 import { PageIntro, Panel } from "@/components/common/page-intro";
 import { FunnelPlot, type FunnelLabel } from "@/components/distinctive/funnel-plot";
 import { GroupControls } from "@/components/distinctive/group-controls";
+import { StabilityPanel } from "@/components/distinctive/stability-panel";
 import { WordColumn } from "@/components/distinctive/word-column";
 import { formatCompact, formatDate, formatInt } from "@/lib/format";
 import { parseDistinctiveParams } from "@/lib/params";
@@ -14,6 +15,7 @@ import { buildHref } from "@/lib/url";
 import { getSpeakers } from "@/server/corpus";
 import {
   computeFightinWords,
+  computeStability,
   groupLabel,
   groupToken,
   parseGroup,
@@ -124,7 +126,7 @@ async function DistinctiveResults({
             <StatTile
               label="Words beyond |z| = 1.96"
               value={formatInt(view.significant)}
-              note="out of 16,877 indexed words"
+              note="of 16,877 words; about 840 would cross it by chance alone"
             />
             <StatTile
               label="Prior strength α₀"
@@ -187,6 +189,22 @@ async function DistinctiveResults({
               />
             </Panel>
           </div>
+
+          <section id="stability" aria-labelledby="stability-heading">
+            <Suspense
+              fallback={
+                <Panel>
+                  <p className="font-serif text-xl">How stable are these lists?</p>
+                  <p className="mt-2 text-sm text-muted-foreground" aria-busy="true">
+                    Resampling documents and recomputing both lists…
+                  </p>
+                  <div className="mt-4 h-64 animate-pulse rounded-md bg-muted" />
+                </Panel>
+              }
+            >
+              <Stability a={a} b={b} alpha0={params.prior} labelA={labelA} labelB={labelB} />
+            </Suspense>
+          </section>
 
           <section id="examples" aria-labelledby="examples-heading">
             <Panel>
@@ -251,8 +269,8 @@ async function DistinctiveResults({
             critically, and press-release boilerplate (names, places, “county”) counts like any
             other word. Stop-words are excluded; words must appear in at least five documents.
             Details and formula on the{" "}
-            <Link href="/method#fightin-words" className="inline-link">
-              method page
+            <Link href="/methods#fightin-words" className="inline-link">
+              methods page
             </Link>
             .
           </Callout>
@@ -260,4 +278,23 @@ async function DistinctiveResults({
       )}
     </div>
   );
+}
+
+/** Streams in after the lists: the bootstrap takes a moment for large groups. */
+async function Stability({
+  a,
+  b,
+  alpha0,
+  labelA,
+  labelB,
+}: {
+  a: GroupSpec;
+  b: GroupSpec;
+  alpha0: number;
+  labelA: string;
+  labelB: string;
+}) {
+  // Yield once so the lists above are sent before the resampling starts.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  return <StabilityPanel view={computeStability(a, b, alpha0)} labelA={labelA} labelB={labelB} />;
 }

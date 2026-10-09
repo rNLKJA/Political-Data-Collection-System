@@ -119,6 +119,7 @@ export function fightinWordsStability(
   }: StabilityOptions = {},
 ): StabilityResult {
   const V = ix.offsets.length - 1;
+  const fwd = forwardIndex(ix);
   const rng = mulberry32(seed);
   const wA = new Float64Array(ix.nDocs);
   const wB = new Float64Array(ix.nDocs);
@@ -130,23 +131,29 @@ export function fightinWordsStability(
   const inB = topB.map(() => 0);
   const nA = docsA.length;
   const nB = docsB.length;
+  const { offsets: fOff, terms: fTerm, counts: fCnt } = fwd;
 
   for (let r = 0; r < resamples; r++) {
     wA.fill(0);
     wB.fill(0);
+    yA.fill(0);
+    yB.fill(0);
     for (let i = 0; i < nA; i++) wA[docsA[Math.floor(rng() * nA)]] += 1;
     for (let i = 0; i < nB; i++) wB[docsB[Math.floor(rng() * nB)]] += 1;
-    for (let t = 0; t < V; t++) {
-      let sa = 0;
-      let sb = 0;
-      for (let i = ix.offsets[t]; i < ix.offsets[t + 1]; i++) {
-        const d = ix.docs[i];
-        const c = ix.counts[i];
-        sa += wA[d] * c;
-        sb += wB[d] * c;
+    // Document-major: only documents drawn into a resample contribute. Documents
+    // are visited in id order, so each term's sum is accumulated in the same
+    // order as a term-major pass over the (doc-sorted) postings.
+    for (let d = 0; d < ix.nDocs; d++) {
+      const a = wA[d];
+      const b = wB[d];
+      if (a === 0 && b === 0) continue;
+      const end = fOff[d + 1];
+      for (let i = fOff[d]; i < end; i++) {
+        const t = fTerm[i];
+        const c = fCnt[i];
+        yA[t] += a * c;
+        yB[t] += b * c;
       }
-      yA[t] = sa;
-      yB[t] = sb;
     }
     const { z } = fightinWords(yA, yB, prior, alpha0);
     const used = (t: number) => yA[t] + yB[t] > 0;
@@ -184,6 +191,39 @@ export function fightinWordsStability(
     a: summarise(topA, zA, inA),
     b: summarise(topB, zB, inB),
   };
+}
+
+export interface ForwardIndex {
+  /** postings of document d live in terms/counts[offsets[d] .. offsets[d + 1]) */
+  offsets: Int32Array;
+  terms: Int32Array;
+  counts: Int32Array;
+}
+
+const forwardCache = new WeakMap<PostingsIndex, ForwardIndex>();
+
+/** The inverted index transposed to one row per document (built once per index). */
+export function forwardIndex(ix: PostingsIndex): ForwardIndex {
+  const hit = forwardCache.get(ix);
+  if (hit) return hit;
+  const V = ix.offsets.length - 1;
+  const P = ix.docs.length;
+  const offsets = new Int32Array(ix.nDocs + 1);
+  for (let i = 0; i < P; i++) offsets[ix.docs[i] + 1]++;
+  for (let d = 0; d < ix.nDocs; d++) offsets[d + 1] += offsets[d];
+  const next = offsets.slice(0, ix.nDocs);
+  const terms = new Int32Array(P);
+  const counts = new Int32Array(P);
+  for (let t = 0; t < V; t++) {
+    for (let i = ix.offsets[t]; i < ix.offsets[t + 1]; i++) {
+      const p = next[ix.docs[i]]++;
+      terms[p] = t;
+      counts[p] = ix.counts[i];
+    }
+  }
+  const fwd = { offsets, terms, counts };
+  forwardCache.set(ix, fwd);
+  return fwd;
 }
 
 /** Term counts summed over a list of documents (each counted once). */

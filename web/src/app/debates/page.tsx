@@ -107,8 +107,8 @@ export default function DebatesPage() {
           Office or newspapers, newer ones from networks, and some mark crosstalk while others do
           not. Speaker roles come from turn labels and a list of the people who debated in each
           cycle; anyone else who speaks counts as a moderator, panellist or questioner. See{" "}
-          <Link href="/method#debates" className="inline-link">
-            Method
+          <Link href="/methods#debates" className="inline-link">
+            Methods
           </Link>{" "}
           for the segmentation rules.
         </Callout>

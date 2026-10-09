@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "sync:docs": "node scripts/sync-docs.mjs"
   },
   "dependencies": {
     "cn": "^0.4.0",

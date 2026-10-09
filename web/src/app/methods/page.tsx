@@ -14,11 +14,21 @@ import parity from "@/data/parity-python.json";
 import { formatInt, formatPercent } from "@/lib/format";
 import { APP_CITATION, SITE } from "@/lib/site";
 import { getConcepts, getOverview } from "@/server/corpus";
+import { listDecisions } from "@/server/docs";
+import { readabilitySummary } from "@/server/readability";
+import { buildSystemPrompt } from "@/lib/ai/topic-labels";
+import { ANTHROPIC_MODELS, DEFAULT_OPENAI_MODEL } from "@/lib/ai/providers";
+import { DEFAULT_SEED } from "@/lib/stats/bootstrap";
+import { STABILITY_RESAMPLES } from "@/lib/stats/fw-stability";
+import { READABILITY_RESAMPLES } from "@/lib/readability-stats";
+import { EVAL_ITEMS, GOLD_META, SAMPLE_META } from "@/lib/topics/data";
+import { scoreLabeller } from "@/lib/topics/evaluation";
+import { KEYWORD_RULES_VERSION, keywordLabel } from "@/lib/topics/keyword-rules";
 
 export const metadata: Metadata = {
-  title: "Method and source",
+  title: "Methods, decisions and AI use",
   description:
-    "How the 2025 scrapers worked, how their date normalisation and transcript splitting were ported to TypeScript and checked against the original CSVs, and how every statistic on the site is computed.",
+    "How the 2025 scrapers worked and were checked, how every statistic and interval on the site is computed, the topic-label evaluation design, assumptions and limits, decision records, the model card and the AI use statement.",
 };
 
 const TOC = [
@@ -32,6 +42,14 @@ const TOC = [
   ["timeline", "Rates and intervals"],
   ["debates", "Debate turns and roles"],
   ["source", "Source, licence and limits"],
+  ["stability", "Stability of word lists"],
+  ["readability-intervals", "Uncertainty in reading grades"],
+  ["topic-eval", "Topic labels: evaluation"],
+  ["assumptions", "Assumptions and limitations"],
+  ["ai-use", "AI use statement"],
+  ["model-card", "Model card"],
+  ["decisions", "Decision records"],
+  ["change", "What I'd change"],
 ] as const;
 
 function Step({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
@@ -61,6 +79,13 @@ function Formula({ children, label }: { children: React.ReactNode; label: string
 export default function MethodPage() {
   const o = getOverview();
   const concepts = getConcepts();
+  const decisions = listDecisions();
+  const readability = readabilitySummary();
+  const baseline = scoreLabeller(
+    EVAL_ITEMS.map((i) => i.gold),
+    EVAL_ITEMS.map((i) => keywordLabel(i.excerpt).topic),
+  );
+  const promptChars = buildSystemPrompt().length;
   const docMismatch = Object.values(parity.documents.mismatches).reduce((a, b) => a + b, 0);
   const debMismatch = Object.values(parity.debates.mismatches).reduce((a, b) => a + b, 0);
   const parityRows = [
@@ -100,18 +125,32 @@ export default function MethodPage() {
       py: null,
       ts: "stats.test.ts (vs Python and SciPy)",
     },
+    {
+      what: "Bootstrap, Wilson, kappa, McNemar, OLS; word-list stability",
+      n: "reference fixtures",
+      py: null,
+      ts: "stats-extra.test.ts (vs numpy, SciPy, statsmodels, scikit-learn, a Python port)",
+    },
+    {
+      what: "Reading-grade intervals, paired gap and debate trends",
+      n: `${formatInt(o.documents)} documents, 179 debates`,
+      py: null,
+      ts: "readability-stats.test.ts (vs numpy on analytics.db)",
+    },
   ];
 
   return (
     <>
       <PageIntro
         kicker="Method and source"
-        title="How the archive was collected, ported and checked"
+        title="How the archive was collected, checked and analysed"
       >
         <p>
           Everything on this site comes from the CSV files the 2025 notebooks wrote. Nothing was
           scraped again. This page describes the original collector, the parts of it that were
-          ported to TypeScript, and every calculation the site adds.
+          ported to TypeScript, every calculation and interval the site adds, the topic-label
+          evaluation, the assumptions and limits, the decisions behind them, and how AI is and is
+          not used.
         </p>
       </PageIntro>
 
@@ -275,9 +314,10 @@ export default function MethodPage() {
               “Identical” means every field compared equal as strings: 0 mismatches across{" "}
               {parity.documents.fieldsChecked.length} document fields and{" "}
               {parity.debates.fieldsChecked.length} debate fields. The TypeScript suites assert the
-              same with zero tolerance (floating-point values to 1e-9). The last two rows are code
+              same with zero tolerance (floating-point values to 1e-9). The last four rows are code
               written for the revival, so there is no notebook to compare with; their TypeScript is
-              checked against the revival&apos;s own Python build and SciPy instead.
+              checked against the revival&apos;s own Python build and the Python scientific stack
+              instead (<code className="inline">scripts/stats_reference.py</code>).
             </p>
           </Section>
 
@@ -500,6 +540,295 @@ rate  = k / N × 10,000      interval scaled the same way`}
               </Link>{" "}
               links every document back to its source page for checking.
             </Callout>
+          </Section>
+
+          <Section
+            id="stability"
+            kicker="11"
+            title="Stability of the word lists"
+            className="px-0 sm:px-0"
+          >
+            <div className="prose-archive">
+              <p>
+                The Fightin&apos; Words z-score treats each word token as an independent draw.
+                Campaign text is clustered: one press release can repeat a county&apos;s name thirty
+                times. Every comparison on{" "}
+                <Link href="/distinctive#stability" className="inline-link">
+                  Distinctive words
+                </Link>{" "}
+                is therefore checked by resampling documents, not words: the documents of each group
+                are drawn with replacement ({STABILITY_RESAMPLES} times, seed {DEFAULT_SEED}, group
+                A first, then group B, from one mulberry32 stream), every z-score is recomputed with
+                the same prior and α₀, and for each listed word the page reports the share of
+                resamples in which it stays in its side&apos;s top 30, the 2.5th to 97.5th
+                percentile of its z-score, the documents that use it and the share of its uses from
+                its heaviest document.
+              </p>
+              <p>
+                With {STABILITY_RESAMPLES} resamples a kept share has a Monte Carlo standard error
+                of at most {(100 * Math.sqrt(0.25 / STABILITY_RESAMPLES)).toFixed(1)} percentage
+                points. Separately, with {formatInt(o.vocabulary)} words tested at |z| = 1.96, about{" "}
+                {formatInt(Math.round(o.vocabulary * 0.05))} would cross the line by chance alone,
+                so the lists are rankings to explore, not a set of findings. Rationale and results:{" "}
+                <Link
+                  href="/methods/decisions/dr-003-term-statistics-method"
+                  className="inline-link"
+                >
+                  DR-003
+                </Link>
+                .
+              </p>
+            </div>
+          </Section>
+
+          <Section
+            id="readability-intervals"
+            kicker="12"
+            title="Uncertainty in reading grades"
+            className="px-0 sm:px-0"
+          >
+            <div className="prose-archive">
+              <p>
+                Every interval on{" "}
+                <Link href="/readability" className="inline-link">
+                  Readability
+                </Link>{" "}
+                is a 95% percentile bootstrap ({formatInt(READABILITY_RESAMPLES)} resamples, seed{" "}
+                {DEFAULT_SEED}) that resamples the unit the claim is about: documents within a cycle
+                and kind of text, debates for a trend (the slope of a least-squares line per decade,
+                and a pointwise band for the fitted line), and speakers for the paired comparison of
+                each speaker&apos;s transcribed and written texts. Groups of fewer than five get a
+                point estimate and no interval.
+              </p>
+              <p>
+                Because the grade is linear in words per sentence (WPS) and syllables per word
+                (SPW), a difference of mean grades splits exactly into a sentence-length part and a
+                word-length part. For the {readability.gap.speakers.length} speakers with enough of
+                both kinds of text, the mean gap is {readability.gap.gap.estimate.toFixed(1)} grade
+                levels (95% CI {readability.gap.gap.lower.toFixed(1)} to{" "}
+                {readability.gap.gap.upper.toFixed(1)}), of which{" "}
+                {readability.gap.sentencePart.estimate.toFixed(1)} comes from sentence length. These
+                intervals cover sampling, not measurement: they do not include the effect of who
+                transcribed a debate, which the page shows separately with two events the archive
+                holds in two transcripts.
+              </p>
+            </div>
+            <Formula label="Splitting a difference in mean grade">
+              {`Δgrade = 0.39 × ΔWPS  +  11.8 × ΔSPW
+         (sentence length)   (word length)`}
+            </Formula>
+          </Section>
+
+          <Section
+            id="topic-eval"
+            kicker="13"
+            title="Topic labels: evaluation design"
+            className="px-0 sm:px-0"
+          >
+            <div className="prose-archive">
+              <p>
+                <strong>Question.</strong> On one-sentence campaign excerpts, how often does a
+                language model give the same policy-topic label as a careful coder, compared with a
+                transparent keyword dictionary?
+              </p>
+              <p>
+                <strong>Set.</strong> {EVAL_ITEMS.length} sentences of {SAMPLE_META.words[0]} to{" "}
+                {SAMPLE_META.words[1]} words, {SAMPLE_META.perCycle} per cycle, one per randomly
+                drawn document (seed {SAMPLE_META.seed}), after the quotation rules. The draw is
+                blind to keywords, so it does not favour the dictionary. Gold labels:{" "}
+                {GOLD_META.status === "draft"
+                  ? "a single-annotator draft prepared by the AI coding assistant that built this upgrade, not yet reviewed by a person"
+                  : "reviewed"}
+                ; until reviewed, every score is provisional.
+              </p>
+              <p>
+                <strong>Labellers.</strong> The keyword rules ({KEYWORD_RULES_VERSION}) were written
+                before the set was drawn and frozen. The model sees the codebook (21 CAP-style
+                topics and &ldquo;none&rdquo;), five coding rules and up to ten excerpts with opaque
+                ids per request; the system prompt is {formatInt(promptChars)} characters. Defaults:{" "}
+                {ANTHROPIC_MODELS[0].label} at temperature 0, or {ANTHROPIC_MODELS[1].label} at low
+                effort, or an OpenAI model ({DEFAULT_OPENAI_MODEL} by default).
+              </p>
+              <p>
+                <strong>Metrics.</strong> Agreement with gold (Wilson interval), Cohen&apos;s kappa
+                (percentile bootstrap over excerpts), agreement on the excerpts with a policy topic,
+                and a paired comparison on the same excerpts: the difference in agreement and in
+                kappa (paired bootstrap, so both labellers see the same resamples) and
+                McNemar&apos;s exact test. The keyword baseline on all {baseline.n} excerpts:{" "}
+                {(100 * baseline.agreement.estimate).toFixed(1)}% agreement (95% CI{" "}
+                {(100 * baseline.agreement.lower).toFixed(1)} to{" "}
+                {(100 * baseline.agreement.upper).toFixed(1)}), kappa{" "}
+                {baseline.kappa.estimate.toFixed(2)} ({baseline.kappa.lower.toFixed(2)} to{" "}
+                {baseline.kappa.upper.toFixed(2)}).
+              </p>
+            </div>
+          </Section>
+
+          <Section
+            id="assumptions"
+            kicker="14"
+            title="Assumptions and limitations"
+            className="px-0 sm:px-0"
+          >
+            <ul className="prose-archive list-disc space-y-2 pl-5">
+              <li>
+                <strong>Coverage.</strong> The documents are what the archive files as campaign
+                documents; volumes per candidate reflect the campaign and the archive, not how much
+                anyone said.
+              </li>
+              <li>
+                <strong>Own voice.</strong> Text is attributed by speaker labels. Interviewer turns
+                without a label stay in, and labelled turns by people not on the candidate lists are
+                dropped.
+              </li>
+              <li>
+                <strong>Independence.</strong> z-scores and Poisson intervals treat word tokens as
+                independent. The word lists now carry a document-level bootstrap check; the timeline
+                intervals do not yet, so they are too narrow when a few documents repeat a term.
+              </li>
+              <li>
+                <strong>Readability.</strong> Flesch-Kincaid was built for edited English prose.
+                Transcripts are punctuated by transcribers, so grades compare like with like only
+                roughly, and never measure quality.
+              </li>
+              <li>
+                <strong>Intervals.</strong> Every interval covers sampling variability given the
+                pipeline&apos;s choices (tokeniser, stop words, cleaning, roles). None of them
+                covers uncertainty in those choices.
+              </li>
+              <li>
+                <strong>Topic labels.</strong> A small, single-annotator draft gold set; most topics
+                have one to eight excerpts; one sentence out of context is hard for any coder.
+              </li>
+              <li>
+                <strong>Many tests.</strong> Distinctive words tests every indexed word at once;
+                some extreme z-scores are chance.
+              </li>
+            </ul>
+          </Section>
+
+          <Section id="ai-use" kicker="15" title="AI use statement" className="px-0 sm:px-0">
+            <div className="prose-archive">
+              <p>
+                <strong>What AI does here.</strong> One optional feature: on{" "}
+                <Link href="/topics" className="inline-link">
+                  Topic labels
+                </Link>
+                , a language model you choose labels the policy topic of short excerpts so that it
+                can be compared with keyword rules and gold labels. It runs only when you start it,
+                with your own API key.
+              </p>
+              <p>
+                <strong>What it never does.</strong> It produces no number anywhere else on the
+                site; every other page is computed without AI. It is never told who said an excerpt,
+                it is never used to compare candidates or parties, and its labels are never
+                presented as facts: every output carries an &ldquo;AI-generated&rdquo; label, and
+                the simulated demo is labelled as simulated.
+              </p>
+              <p>
+                <strong>Data sent to the provider.</strong> The codebook, the coding rules and the
+                excerpts (one sentence of 25 words or fewer each, with an opaque id), from your
+                browser straight to Anthropic or OpenAI. Your key is kept in your browser
+                (sessionStorage, or localStorage if you tick &ldquo;remember on this device&rdquo;),
+                never sent to this site&apos;s server and never logged. The provider&apos;s own
+                terms apply to what you send it.
+              </p>
+              <p>
+                <strong>Human in the loop and audit.</strong> You can accept, correct or reject each
+                run; corrections are recorded as edits and never change the scores, which always use
+                the model&apos;s own labels. Every call, failure and simulated run is logged in your
+                browser&apos;s IndexedDB with the prompt, the answer, latency, token use and your
+                decision, viewable and exportable (JSON or CSV) on the{" "}
+                <Link href="/ai-log" className="inline-link">
+                  AI audit log
+                </Link>
+                .
+              </p>
+              <p>
+                <strong>Frameworks.</strong> This design is informed by the Australian
+                Government&apos;s policy for the responsible use of AI in government, the
+                transparency principles of the EU AI Act and the NIST AI Risk Management Framework.
+                It does not claim compliance with any of them.
+              </p>
+              <p>
+                <strong>AI in building the site.</strong> The 2026 upgrade was built with an AI
+                coding assistant, which also prepared the draft gold labels (see{" "}
+                <Link
+                  href="/methods/decisions/dr-004-llm-topic-labels-vs-keyword-rules"
+                  className="inline-link"
+                >
+                  DR-004
+                </Link>
+                ). Every statistic is computed by code that is tested against independent Python
+                implementations.
+              </p>
+            </div>
+          </Section>
+
+          <Section id="model-card" kicker="16" title="Model card" className="px-0 sm:px-0">
+            <div className="prose-archive">
+              <p>
+                The two topic labellers (keyword rules and the bring-your-own-key LLM) have a model
+                card: intended use, data provenance, evaluation with intervals, known failure modes
+                with examples from the gold set, and ethical considerations.
+              </p>
+            </div>
+            <Link
+              href="/methods/model-card"
+              className="mt-4 inline-flex items-center gap-1 rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-accent"
+            >
+              Read the model card →
+            </Link>
+          </Section>
+
+          <Section
+            id="decisions"
+            kicker="17"
+            title="Decision records"
+            className="px-0 sm:px-0"
+            description="Each record states the decision first, then the context, the options, why, what happened (weak numbers included) and what I'd change. Records are never edited; a change of mind gets a new record."
+          >
+            <ol className="divide-y divide-border/70 rounded-lg border border-border bg-card">
+              {decisions.map((d) => (
+                <li key={d.slug}>
+                  <Link
+                    href={`/methods/decisions/${d.slug}`}
+                    className="block px-4 py-3.5 transition-colors hover:bg-accent/40"
+                  >
+                    <span className="kicker">
+                      {d.id} · {d.status} · {d.decided}
+                    </span>
+                    <span className="mt-1 block font-serif text-[1.05rem]">{d.title}</span>
+                    <span className="mt-1 block text-sm text-muted-foreground">{d.decision}</span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          </Section>
+
+          <Section id="change" kicker="18" title="What I'd change" className="px-0 sm:px-0">
+            <ul className="prose-archive list-disc space-y-2 pl-5">
+              <li>
+                Have two people label the topic gold set independently, report their agreement and
+                resolve disagreements; grow the set so every topic has at least ten excerpts.
+              </li>
+              <li>
+                Extend the document-level bootstrap (or a negative binomial model) to the timeline,
+                whose Poisson intervals ignore overdispersion.
+              </li>
+              <li>
+                Re-derive reading grades from sentence boundaries normalised across transcript
+                sources, then measure how much of the debate trend survives.
+              </li>
+              <li>
+                Commit dated reference LLM runs, repeated, once there is a small budget, so the
+                comparison is visible without a key and run-to-run variation is measured.
+              </li>
+              <li>
+                Ask the archive&apos;s editors how they would like the collected full texts kept,
+                and move them out of the public repository if they prefer.
+              </li>
+            </ul>
           </Section>
         </div>
       </div>

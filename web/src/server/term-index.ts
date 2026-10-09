@@ -3,6 +3,7 @@ import "server-only";
 import { CYCLES, type Cycle } from "@/lib/corpus-types";
 import { decodePostings } from "@/lib/postings";
 import { DEFAULT_ALPHA0, fightinWords, Z_THRESHOLD } from "@/lib/stats/fightin-words";
+import { fightinWordsStability } from "@/lib/stats/fw-stability";
 import { rateWithInterval } from "@/lib/stats/poisson";
 import { allMonths, getDocumentsByIds, speakerBySlug } from "@/server/corpus";
 import { all } from "@/server/db";
@@ -442,4 +443,93 @@ export function topDocsForTerm(perDoc: Map<number, number>, speakerSlugs: string
     const docs = getDocumentsByIds(hits.map((h) => h[0]));
     return { group, docs: docs.map((d, i) => ({ ...d, count: hits[i][1] })) };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Bootstrap stability of the top lists (documents resampled within each group)
+// ---------------------------------------------------------------------------
+
+export interface StableWord {
+  term: string;
+  z: number;
+  zLower: number;
+  zUpper: number;
+  /** share of resamples in which the word stays in its side's top list */
+  stability: number;
+  /** documents in the word's own group that use it */
+  docs: number;
+  /** share of the group's uses that come from its single heaviest document */
+  topDocShare: number;
+}
+
+export interface StabilityView {
+  resamples: number;
+  seed: number;
+  top: number;
+  docsA: number;
+  docsB: number;
+  a: StableWord[];
+  b: StableWord[];
+  ms: number;
+}
+
+const stabilityCache = new Map<string, StabilityView>();
+
+export function computeStability(
+  a: GroupSpec,
+  b: GroupSpec,
+  alpha0 = DEFAULT_ALPHA0,
+  top = 30,
+): StabilityView {
+  const key = `${groupToken(a)}|${groupToken(b)}|${alpha0}|${top}`;
+  const hit = stabilityCache.get(key);
+  if (hit) return hit;
+  const t0 = performance.now();
+  const ix = getIndex();
+  const view = computeFightinWords(a, b, alpha0, top);
+  const [ma, mb] = groupMasks(a, b, ix);
+  const list = (m: Uint8Array) => {
+    const out: number[] = [];
+    for (let d = 0; d < ix.nDocs; d++) if (m[d]) out.push(d);
+    return Int32Array.from(out);
+  };
+  const docsA = list(ma);
+  const docsB = list(mb);
+  const idsA = view.topA.map((w) => ix.termId.get(w.term)!);
+  const idsB = view.topB.map((w) => ix.termId.get(w.term)!);
+  const res = fightinWordsStability(ix, ix.cf, docsA, docsB, idsA, idsB, { top, alpha0 });
+  const concentration = (t: number, m: Uint8Array) => {
+    let docs = 0;
+    let total = 0;
+    let max = 0;
+    for (let i = ix.offsets[t]; i < ix.offsets[t + 1]; i++) {
+      if (!m[ix.docs[i]]) continue;
+      docs++;
+      total += ix.counts[i];
+      max = Math.max(max, ix.counts[i]);
+    }
+    return { docs, topDocShare: total ? max / total : 0 };
+  };
+  const words = (rows: typeof res.a, m: Uint8Array): StableWord[] =>
+    rows.map((r) => ({
+      term: ix.terms[r.term],
+      z: r.z,
+      zLower: r.zLower,
+      zUpper: r.zUpper,
+      stability: r.stability,
+      ...concentration(r.term, m),
+    }));
+  const out: StabilityView = {
+    resamples: res.resamples,
+    seed: res.seed,
+    top,
+    docsA: docsA.length,
+    docsB: docsB.length,
+    a: words(res.a, ma),
+    b: words(res.b, mb),
+    ms: performance.now() - t0,
+  };
+  if (stabilityCache.size > 50) stabilityCache.clear();
+  stabilityCache.set(key, out);
+  return out;
 }

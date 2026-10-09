@@ -7,16 +7,51 @@ export const SITE = {
   app: "https://www.presidency.ucsb.edu",
 } as const;
 
+/** `short` is the label in the desktop header, where seven links share one line. */
 export const NAV = [
-  { href: "/explorer", label: "Explorer", blurb: "Filter documents by candidate, type and date." },
+  {
+    href: "/explorer",
+    label: "Explorer",
+    short: "Explorer",
+    blurb: "Filter documents by candidate, type and date.",
+  },
   {
     href: "/distinctive",
     label: "Distinctive words",
-    blurb: "Compare two speakers or periods with Fightin' Words.",
+    short: "Distinctive words",
+    blurb:
+      "Compare two speakers or periods with Fightin' Words, and check how stable the lists are.",
   },
-  { href: "/debates", label: "Debates", blurb: "Talk share and turn lengths, 1960 to 2024." },
-  { href: "/timeline", label: "Term timeline", blurb: "How often a term appears, month by month." },
-  { href: "/method", label: "Method", blurb: "How the data was collected and checked." },
+  {
+    href: "/debates",
+    label: "Debates",
+    short: "Debates",
+    blurb: "Talk share and turn lengths, 1960 to 2024.",
+  },
+  {
+    href: "/timeline",
+    label: "Term timeline",
+    short: "Timeline",
+    blurb: "How often a term appears, month by month.",
+  },
+  {
+    href: "/readability",
+    label: "Readability",
+    short: "Readability",
+    blurb: "Reading-grade trends with intervals, and what transcription does to them.",
+  },
+  {
+    href: "/topics",
+    label: "Topic labels",
+    short: "Topic labels",
+    blurb: "An LLM against keyword rules on a hand-labelled set (bring your own key).",
+  },
+  {
+    href: "/methods",
+    label: "Methods",
+    short: "Methods",
+    blurb: "Collection, checks, statistics, decision records and AI use.",
+  },
 ] as const;
 
 export const APP_CITATION =

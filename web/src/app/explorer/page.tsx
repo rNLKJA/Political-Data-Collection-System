@@ -224,8 +224,8 @@ async function ExplorerResults({
             others. Word counts are the scraper&apos;s originals. Reading grades use only text in
             the candidate&apos;s own voice: interviewer, audience and moderator turns inside
             transcripts are left out (see{" "}
-            <Link href="/method#attribution" className="inline-link">
-              Method
+            <Link href="/methods#attribution" className="inline-link">
+              Methods
             </Link>
             ). Dates run from {formatDate("2016-01-01")} to {formatDate("2024-11-06")}.
           </Callout>

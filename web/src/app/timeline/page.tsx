@@ -310,8 +310,8 @@ async function TimelineResults({
         period&apos;s count as Poisson: with 10,000 words and no mentions the band still reaches
         about 3.7 per 10k. Topic lists are matched as whole words or phrases after lower-casing;
         they count mentions, not stances. See{" "}
-        <Link href="/method#timeline" className="inline-link">
-          Method
+        <Link href="/methods#timeline" className="inline-link">
+          Methods
         </Link>
         .
       </Callout>

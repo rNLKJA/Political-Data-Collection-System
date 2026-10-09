@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AiSettingsButton } from "@/components/ai/ai-settings-button";
 import { MobileNav, NavLinks } from "@/components/layout/nav-links";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { SITE } from "@/lib/site";
@@ -23,10 +24,11 @@ export function SiteHeader() {
             Campaign Text <span className="italic">Lab</span>
           </span>
         </Link>
-        <nav aria-label="Main" className="ml-auto hidden md:block">
+        <nav aria-label="Main" className="ml-auto hidden lg:block">
           <NavLinks />
         </nav>
-        <div className="ml-auto flex items-center gap-2 md:ml-2">
+        <div className="ml-auto flex items-center gap-2 lg:ml-1">
+          <AiSettingsButton />
           <ThemeToggle />
           <MobileNav />
         </div>

@@ -46,6 +46,19 @@ export function SiteFooter() {
                 About this project
               </Link>
             </li>
+            <li>
+              <Link href="/ai-log" className="text-muted-foreground hover:text-foreground">
+                AI audit log (this browser)
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/methods#decisions"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Decision records
+              </Link>
+            </li>
           </ul>
         </div>
       </div>
